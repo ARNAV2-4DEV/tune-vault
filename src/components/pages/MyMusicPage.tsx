@@ -8,8 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Image } from '@/components/ui/image';
 import { Link } from 'react-router-dom';
-import { Music, Search, Upload, Play, Clock, Calendar, Trash2, Disc } from 'lucide-react';
+import { Music, Search, Upload, Play, Clock, Calendar, Trash2, Disc, Pause, Plus, List, Grid, SkipForward, SkipBack, Volume2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useMusicPlayer } from '@/stores/musicPlayerStore';
 
 export default function MyMusicPage() {
   const { member } = useMember();
@@ -17,6 +18,17 @@ export default function MyMusicPage() {
   const [filteredSongs, setFilteredSongs] = useState<Songs[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  
+  const { 
+    currentSong, 
+    isPlaying, 
+    playSong, 
+    pauseSong, 
+    resumeSong, 
+    addToQueue,
+    queue 
+  } = useMusicPlayer();
 
   useEffect(() => {
     const fetchMySongs = async () => {
@@ -64,6 +76,27 @@ export default function MyMusicPage() {
     }
   }, [searchQuery, songs]);
 
+  const handlePlaySong = (song: Songs) => {
+    if (currentSong?._id === song._id) {
+      if (isPlaying) {
+        pauseSong();
+      } else {
+        resumeSong();
+      }
+    } else {
+      playSong(song, filteredSongs);
+    }
+  };
+
+  const handleAddToQueue = (song: Songs) => {
+    addToQueue(song);
+  };
+
+  const handlePlayAll = () => {
+    if (filteredSongs.length > 0) {
+      playSong(filteredSongs[0], filteredSongs);
+    }
+  };
   const handleDeleteSong = async (songId: string) => {
     if (!confirm('Are you sure you want to delete this song?')) return;
     
@@ -157,6 +190,34 @@ export default function MyMusicPage() {
           </Card>
         ) : (
           <>
+            {/* Controls Bar */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-4">
+                <Button 
+                  onClick={handlePlayAll}
+                  className="bg-neon-teal text-black hover:bg-neon-teal/90 font-paragraph"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Play All
+                </Button>
+                <div className="text-foreground/70 font-paragraph text-sm">
+                  {filteredSongs.length} {filteredSongs.length === 1 ? 'song' : 'songs'}
+                  {queue.length > 0 && ` • ${queue.length} in queue`}
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setViewMode(viewMode === 'list' ? 'grid' : 'list')}
+                  className="border-white/20 text-foreground hover:bg-white/10"
+                >
+                  {viewMode === 'list' ? <Grid className="h-4 w-4" /> : <List className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+
             {/* Search Bar */}
             <div className="mb-8">
               <div className="relative max-w-md">
@@ -170,70 +231,193 @@ export default function MyMusicPage() {
               </div>
             </div>
 
-            {/* Songs Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredSongs.map((song) => (
-                <Card key={song._id} className="bg-white/5 border-white/10 backdrop-blur-sm hover:bg-white/10 transition-all duration-300 group">
-                  <CardContent className="p-6">
-                    <div className="relative mb-4">
-                      <Image
-                        src={song.albumArt || 'https://static.wixstatic.com/media/888b2d_25308b4add354645b8f5e229f358bbcb~mv2.png?originWidth=192&originHeight=192'}
-                        alt={`${song.title} album art`}
-                        className="w-full aspect-square object-cover rounded-lg"
-                        width={200}
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex items-center justify-center">
-                        <Link to={`/song/${song._id}`}>
-                          <Button size="sm" className="bg-neon-teal text-black hover:bg-neon-teal/90">
-                            <Play className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                        onClick={() => handleDeleteSong(song._id)}
+            {/* Songs Display */}
+            {viewMode === 'list' ? (
+              /* List View */
+              <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
+                <CardContent className="p-0">
+                  <div className="space-y-0">
+                    {filteredSongs.map((song, index) => (
+                      <div 
+                        key={song._id} 
+                        className={`flex items-center p-4 hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0 group ${
+                          currentSong?._id === song._id ? 'bg-neon-teal/10' : ''
+                        }`}
                       >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <h3 className="font-semibold text-foreground truncate font-heading">
-                        {song.title}
-                      </h3>
-                      <p className="text-foreground/70 text-sm truncate font-paragraph">
-                        {song.artistName}
-                      </p>
-                      
-                      {song.albumName && (
-                        <p className="text-foreground/50 text-xs truncate font-paragraph">
-                          {song.albumName}
-                        </p>
-                      )}
-                      
-                      <div className="flex items-center justify-between text-xs text-foreground/50 font-paragraph">
-                        <div className="flex items-center">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {formatDuration(song.duration)}
+                        {/* Track Number / Play Button */}
+                        <div className="w-12 flex items-center justify-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handlePlaySong(song)}
+                            className="w-8 h-8 p-0 hover:bg-neon-teal/20"
+                          >
+                            {currentSong?._id === song._id && isPlaying ? (
+                              <Pause className="h-4 w-4" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )}
+                          </Button>
                         </div>
-                        <div className="flex items-center">
-                          <Calendar className="h-3 w-3 mr-1" />
-                          {formatDate(song.uploadDate || song._createdDate)}
+
+                        {/* Album Art */}
+                        <div className="w-12 h-12 mr-4">
+                          <Image
+                            src={song.albumArt || 'https://static.wixstatic.com/media/888b2d_25308b4add354645b8f5e229f358bbcb~mv2.png?originWidth=192&originHeight=192'}
+                            alt={`${song.title} album art`}
+                            className="w-full h-full object-cover rounded"
+                            width={48}
+                          />
+                        </div>
+
+                        {/* Song Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-4">
+                            <div className="min-w-0 flex-1">
+                              <h3 className={`font-semibold truncate font-heading ${
+                                currentSong?._id === song._id ? 'text-neon-teal' : 'text-foreground'
+                              }`}>
+                                {song.title}
+                              </h3>
+                              <p className="text-foreground/70 text-sm truncate font-paragraph">
+                                {song.artistName}
+                              </p>
+                            </div>
+                            
+                            {song.albumName && (
+                              <div className="hidden md:block min-w-0 flex-1">
+                                <p className="text-foreground/50 text-sm truncate font-paragraph">
+                                  {song.albumName}
+                                </p>
+                              </div>
+                            )}
+                            
+                            {song.genre && (
+                              <div className="hidden lg:block">
+                                <Badge variant="outline" className="text-xs border-neon-teal/50 text-neon-teal">
+                                  {song.genre}
+                                </Badge>
+                              </div>
+                            )}
+                            
+                            <div className="hidden sm:block text-foreground/50 text-sm font-paragraph">
+                              {formatDate(song.uploadDate || song._createdDate)}
+                            </div>
+                            
+                            <div className="text-foreground/50 text-sm font-paragraph">
+                              {formatDuration(song.duration)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddToQueue(song)}
+                            className="hover:bg-neon-teal/20"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteSong(song._id)}
+                            className="hover:bg-red-500/20 text-red-400"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              /* Grid View */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {filteredSongs.map((song) => (
+                  <Card key={song._id} className={`bg-white/5 border-white/10 backdrop-blur-sm hover:bg-white/10 transition-all duration-300 group ${
+                    currentSong?._id === song._id ? 'ring-2 ring-neon-teal/50' : ''
+                  }`}>
+                    <CardContent className="p-6">
+                      <div className="relative mb-4">
+                        <Image
+                          src={song.albumArt || 'https://static.wixstatic.com/media/888b2d_25308b4add354645b8f5e229f358bbcb~mv2.png?originWidth=192&originHeight=192'}
+                          alt={`${song.title} album art`}
+                          className="w-full aspect-square object-cover rounded-lg"
+                          width={200}
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex items-center justify-center space-x-2">
+                          <Button 
+                            size="sm" 
+                            onClick={() => handlePlaySong(song)}
+                            className="bg-neon-teal text-black hover:bg-neon-teal/90"
+                          >
+                            {currentSong?._id === song._id && isPlaying ? (
+                              <Pause className="h-4 w-4" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleAddToQueue(song)}
+                            className="border-white/50 text-white hover:bg-white/20"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                          onClick={() => handleDeleteSong(song._id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                       
-                      {song.genre && (
-                        <Badge variant="outline" className="text-xs border-neon-teal/50 text-neon-teal">
-                          {song.genre}
-                        </Badge>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      <div className="space-y-2">
+                        <h3 className={`font-semibold truncate font-heading ${
+                          currentSong?._id === song._id ? 'text-neon-teal' : 'text-foreground'
+                        }`}>
+                          {song.title}
+                        </h3>
+                        <p className="text-foreground/70 text-sm truncate font-paragraph">
+                          {song.artistName}
+                        </p>
+                        
+                        {song.albumName && (
+                          <p className="text-foreground/50 text-xs truncate font-paragraph">
+                            {song.albumName}
+                          </p>
+                        )}
+                        
+                        <div className="flex items-center justify-between text-xs text-foreground/50 font-paragraph">
+                          <div className="flex items-center">
+                            <Clock className="h-3 w-3 mr-1" />
+                            {formatDuration(song.duration)}
+                          </div>
+                          <div className="flex items-center">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {formatDate(song.uploadDate || song._createdDate)}
+                          </div>
+                        </div>
+                        
+                        {song.genre && (
+                          <Badge variant="outline" className="text-xs border-neon-teal/50 text-neon-teal">
+                            {song.genre}
+                          </Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
 
             {filteredSongs.length === 0 && searchQuery && (
               <Card className="bg-white/5 border-white/10 backdrop-blur-sm">

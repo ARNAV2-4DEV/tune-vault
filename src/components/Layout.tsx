@@ -2,6 +2,7 @@ import { useMember } from '@/integrations';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { MusicPlayer } from '@/components/ui/music-player';
 import { Music, Upload, User, Home, TrendingUp, List, LogOut, Disc } from 'lucide-react';
 
 export default function Layout() {
@@ -144,9 +145,12 @@ export default function Layout() {
       </nav>
 
       {/* Main Content */}
-      <main>
+      <main className="pb-24">
         <Outlet />
       </main>
+
+      {/* Music Player */}
+      <MusicPlayer />
     </div>
   );
 }
