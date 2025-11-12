@@ -13,6 +13,8 @@ export interface Playlists {
   _updatedDate?: Date;
   /** @wixFieldType text */
   playlistName?: string;
+  /** @wixFieldType text */
+  uploadedBy?: string;
   /** @wixFieldType image */
   coverImage?: string;
   /** @wixFieldType text */
@@ -23,8 +25,6 @@ export interface Playlists {
   isPublic?: boolean;
   /** @wixFieldType date */
   creationDate?: Date | string;
-  /** @wixFieldType text */
-  uploadedBy?: string;
 }
 
 
@@ -36,8 +36,14 @@ export interface Songs {
   _id: string;
   _createdDate?: Date;
   _updatedDate?: Date;
+  /** @wixFieldType url */
+  audioFile?: string;
+  /** @wixFieldType datetime */
+  uploadDate?: Date | string;
   /** @wixFieldType text */
   title?: string;
+  /** @wixFieldType text */
+  uploadedBy?: string;
   /** @wixFieldType text */
   artistName?: string;
   /** @wixFieldType text */
@@ -52,12 +58,6 @@ export interface Songs {
   releaseDate?: Date | string;
   /** @wixFieldType text */
   spotifyTrackId?: string;
-  /** @wixFieldType text */
-  uploadedBy?: string;
-  /** @wixFieldType url */
-  audioFile?: string;
-  /** @wixFieldType datetime */
-  uploadDate?: Date | string;
 }
 
 

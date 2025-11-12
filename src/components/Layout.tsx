@@ -2,7 +2,7 @@ import { useMember } from '@/integrations';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { Music, Upload, User, Home, TrendingUp, List, LogOut } from 'lucide-react';
+import { Music, Upload, User, Home, TrendingUp, List, LogOut, Disc } from 'lucide-react';
 
 export default function Layout() {
   const { member, isAuthenticated, isLoading, actions } = useMember();
@@ -75,7 +75,19 @@ export default function Layout() {
                     }`}
                   >
                     <Upload className="h-4 w-4" />
-                    <span>Upload</span>
+                    <span>Upload Song</span>
+                  </Link>
+                  
+                  <Link 
+                    to="/upload-album" 
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors font-paragraph ${
+                      isActive('/upload-album') 
+                        ? 'bg-secondary/20 text-secondary' 
+                        : 'text-foreground/70 hover:text-secondary hover:bg-white/5'
+                    }`}
+                  >
+                    <Disc className="h-4 w-4" />
+                    <span>Upload Album</span>
                   </Link>
                   
                   <Link 

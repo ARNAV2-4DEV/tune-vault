@@ -9,8 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Upload, Music, Image as ImageIcon, CheckCircle, AlertCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Upload, Music, Image as ImageIcon, CheckCircle, AlertCircle, Disc } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
 
 export default function UploadPage() {
   const { member } = useMember();
@@ -142,8 +142,10 @@ export default function UploadPage() {
     <div className="min-h-screen bg-deep-space-blue text-foreground py-12">
       <div className="max-w-4xl mx-auto px-8">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-neon-teal font-heading mb-2">Upload Music</h1>
-          <p className="text-foreground/70 font-paragraph">Share your music with the world</p>
+          <h1 className="text-4xl font-bold text-neon-teal font-heading mb-2">Upload Single Song</h1>
+          <p className="text-foreground/70 font-paragraph">
+            Upload a single track or <Link to="/upload-album" className="text-secondary hover:underline">upload an entire album</Link>
+          </p>
         </div>
 
         <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
@@ -302,6 +304,16 @@ export default function UploadPage() {
 
               {/* Submit Button */}
               <div className="flex justify-end space-x-4">
+                <Link to="/upload-album">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-secondary text-secondary hover:bg-secondary hover:text-black"
+                  >
+                    <Disc className="h-4 w-4 mr-2" />
+                    Upload Album Instead
+                  </Button>
+                </Link>
                 <Button
                   type="button"
                   variant="outline"

@@ -11,6 +11,7 @@ import PlaylistDetailPage from '@/components/pages/PlaylistDetailPage';
 import SongDetailPage from '@/components/pages/SongDetailPage';
 import ProfilePage from '@/components/pages/ProfilePage';
 import UploadPage from '@/components/pages/UploadPage';
+import AlbumUploadPage from '@/components/pages/AlbumUploadPage';
 import MyMusicPage from '@/components/pages/MyMusicPage';
 
 const router = createBrowserRouter([
@@ -52,6 +53,14 @@ const router = createBrowserRouter([
         element: (
           <MemberProtectedRoute messageToSignIn="Sign in to upload your music">
             <UploadPage />
+          </MemberProtectedRoute>
+        ),
+      },
+      {
+        path: "upload-album",
+        element: (
+          <MemberProtectedRoute messageToSignIn="Sign in to upload your album">
+            <AlbumUploadPage />
           </MemberProtectedRoute>
         ),
       },

@@ -7,7 +7,7 @@ import { Songs, Playlists } from '@/entities';
 import { Image } from '@/components/ui/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Play, Music, TrendingUp, Clock, Upload, User } from 'lucide-react';
+import { Play, Music, TrendingUp, Clock, Upload, User, Disc } from 'lucide-react';
 
 export default function HomePage() {
   const { member, isAuthenticated } = useMember();
@@ -125,10 +125,10 @@ export default function HomePage() {
                     Upload Music
                   </Button>
                 </Link>
-                <Link to="/my-music">
+                <Link to="/upload-album">
                   <Button variant="outline" className="border-neon-teal text-neon-teal hover:bg-neon-teal hover:text-black font-paragraph">
-                    <Music className="mr-2 h-4 w-4" />
-                    My Music
+                    <Disc className="mr-2 h-4 w-4" />
+                    Upload Album
                   </Button>
                 </Link>
               </>
@@ -226,12 +226,20 @@ export default function HomePage() {
               Be the first to upload music to our platform! Share your creativity with the world.
             </p>
             {isAuthenticated ? (
-              <Link to="/upload">
-                <Button className="bg-neon-teal text-black hover:bg-neon-teal/90 font-paragraph">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload First Song
-                </Button>
-              </Link>
+              <div className="flex space-x-4 justify-center">
+                <Link to="/upload">
+                  <Button className="bg-neon-teal text-black hover:bg-neon-teal/90 font-paragraph">
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Song
+                  </Button>
+                </Link>
+                <Link to="/upload-album">
+                  <Button variant="outline" className="border-neon-teal text-neon-teal hover:bg-neon-teal hover:text-black font-paragraph">
+                    <Disc className="mr-2 h-4 w-4" />
+                    Upload Album
+                  </Button>
+                </Link>
+              </div>
             ) : (
               <Button 
                 className="bg-neon-teal text-black hover:bg-neon-teal/90 font-paragraph"

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Image } from '@/components/ui/image';
 import { Link } from 'react-router-dom';
-import { Music, Search, Upload, Play, Clock, Calendar, Trash2 } from 'lucide-react';
+import { Music, Search, Upload, Play, Clock, Calendar, Trash2, Disc } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function MyMusicPage() {
@@ -111,12 +111,20 @@ export default function MyMusicPage() {
               {songs.length} {songs.length === 1 ? 'song' : 'songs'} uploaded
             </p>
           </div>
-          <Link to="/upload">
-            <Button className="bg-neon-teal text-black hover:bg-neon-teal/90 font-paragraph">
-              <Upload className="h-4 w-4 mr-2" />
-              Upload New Song
-            </Button>
-          </Link>
+          <div className="flex space-x-3">
+            <Link to="/upload">
+              <Button className="bg-neon-teal text-black hover:bg-neon-teal/90 font-paragraph">
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Song
+              </Button>
+            </Link>
+            <Link to="/upload-album">
+              <Button variant="outline" className="border-secondary text-secondary hover:bg-secondary hover:text-black font-paragraph">
+                <Disc className="h-4 w-4 mr-2" />
+                Upload Album
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {songs.length === 0 ? (
@@ -128,15 +136,23 @@ export default function MyMusicPage() {
                 No songs uploaded yet
               </h3>
               <p className="text-foreground/70 mb-8 font-paragraph max-w-md mx-auto">
-                Start building your music library by uploading your first song. 
+                Start building your music library by uploading your first song or album. 
                 Share your creativity with the world!
               </p>
-              <Link to="/upload">
-                <Button className="bg-neon-teal text-black hover:bg-neon-teal/90 font-paragraph">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Your First Song
-                </Button>
-              </Link>
+              <div className="flex space-x-4 justify-center">
+                <Link to="/upload">
+                  <Button className="bg-neon-teal text-black hover:bg-neon-teal/90 font-paragraph">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Song
+                  </Button>
+                </Link>
+                <Link to="/upload-album">
+                  <Button variant="outline" className="border-secondary text-secondary hover:bg-secondary hover:text-black font-paragraph">
+                    <Disc className="h-4 w-4 mr-2" />
+                    Upload Album
+                  </Button>
+                </Link>
+              </div>
             </CardContent>
           </Card>
         ) : (
