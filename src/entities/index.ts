@@ -23,6 +23,8 @@ export interface Playlists {
   isPublic?: boolean;
   /** @wixFieldType date */
   creationDate?: Date | string;
+  /** @wixFieldType text */
+  uploadedBy?: string;
 }
 
 
@@ -50,6 +52,12 @@ export interface Songs {
   releaseDate?: Date | string;
   /** @wixFieldType text */
   spotifyTrackId?: string;
+  /** @wixFieldType text */
+  uploadedBy?: string;
+  /** @wixFieldType url */
+  audioFile?: string;
+  /** @wixFieldType datetime */
+  uploadDate?: Date | string;
 }
 
 
