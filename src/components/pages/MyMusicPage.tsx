@@ -41,11 +41,31 @@ export default function MyMusicPage() {
       if (!member?.loginEmail && !(member as any)?._id) return;
       
       try {
-        // Fetch songs
-        const { items } = await BaseCrudService.getAll<Songs>('songs');
+        // Fetch ALL songs without pagination limits
+        let allSongs: Songs[] = [];
+        let hasMore = true;
+        let skip = 0;
+        const limit = 100; // Fetch in batches of 100
+        
+        while (hasMore) {
+          const response = await BaseCrudService.getAll<Songs>('songs');
+          const batch = response.items.slice(skip, skip + limit);
+          
+          if (batch.length === 0) {
+            hasMore = false;
+          } else {
+            allSongs = [...allSongs, ...batch];
+            skip += limit;
+            
+            // If we got less than the limit, we've reached the end
+            if (batch.length < limit || skip >= response.items.length) {
+              hasMore = false;
+            }
+          }
+        }
         
         // Filter songs uploaded by current user
-        const userSongs = items.filter(song => 
+        const userSongs = allSongs.filter(song => 
           song.uploadedBy === member.loginEmail || 
           song.uploadedBy === (member as any)._id
         );

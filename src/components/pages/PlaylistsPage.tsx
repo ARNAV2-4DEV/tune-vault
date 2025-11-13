@@ -8,8 +8,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Play, Music, Calendar, ArrowLeft, Lock, Globe } from 'lucide-react';
 import { format } from 'date-fns';
+import { useMember } from '@/integrations';
 
 export default function PlaylistsPage() {
+  const { member } = useMember();
   const [playlists, setPlaylists] = useState<Playlists[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -17,8 +19,17 @@ export default function PlaylistsPage() {
     const fetchPlaylists = async () => {
       try {
         const response = await BaseCrudService.getAll<Playlists>('playlists');
+        
+        // Filter to show only user's own playlists
+        const userPlaylists = response.items.filter(playlist => 
+          playlist.uploadedBy === member?.loginEmail || 
+          playlist.uploadedBy === (member as any)?._id ||
+          playlist.creator === member?.loginEmail ||
+          playlist.creator === (member as any)?._id
+        );
+        
         // Sort by creation date, newest first
-        const sortedPlaylists = response.items.sort((a, b) => {
+        const sortedPlaylists = userPlaylists.sort((a, b) => {
           const dateA = new Date(a.creationDate || a._createdDate || 0);
           const dateB = new Date(b.creationDate || b._createdDate || 0);
           return dateB.getTime() - dateA.getTime();
@@ -31,8 +42,12 @@ export default function PlaylistsPage() {
       }
     };
 
-    fetchPlaylists();
-  }, []);
+    if (member) {
+      fetchPlaylists();
+    } else {
+      setIsLoading(false);
+    }
+  }, [member]);
 
   if (isLoading) {
     return (
@@ -59,9 +74,9 @@ export default function PlaylistsPage() {
           >
             <Music className="h-12 w-12 text-secondary" />
             <div>
-              <h1 className="text-5xl font-bold text-secondary font-heading mb-2">Playlists</h1>
+              <h1 className="text-5xl font-bold text-secondary font-heading mb-2">My Playlists</h1>
               <p className="text-foreground/70 text-lg font-paragraph">
-                Discover curated collections and create your own
+                Your personal music collections
               </p>
             </div>
           </motion.div>
@@ -148,10 +163,18 @@ export default function PlaylistsPage() {
           ))}
         </div>
 
-        {playlists.length === 0 && (
+        {playlists.length === 0 && !member && (
           <div className="text-center py-12">
             <Music className="h-16 w-16 text-foreground/30 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-foreground/70 mb-2 font-heading">No playlists found</h3>
+            <h3 className="text-xl font-semibold text-foreground/70 mb-2 font-heading">Sign in to view your playlists</h3>
+            <p className="text-foreground/50 font-paragraph">Create an account to start building your music collections</p>
+          </div>
+        )}
+
+        {playlists.length === 0 && member && (
+          <div className="text-center py-12">
+            <Music className="h-16 w-16 text-foreground/30 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-foreground/70 mb-2 font-heading">No playlists yet</h3>
             <p className="text-foreground/50 font-paragraph">Create your first playlist to get started</p>
           </div>
         )}

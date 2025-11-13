@@ -54,13 +54,20 @@ export default function PlaylistDetailPage() {
         );
         setCanEdit(!!userCanEdit);
 
-        // Fetch actual songs from playlist
+        // Fetch actual songs from playlist - only show user's uploaded songs
         if (playlistData.songs) {
           const songIds = playlistData.songs.split(',').filter(id => id.trim());
           if (songIds.length > 0) {
             const allSongs = await BaseCrudService.getAll<Songs>('songs');
+            
+            // Filter to only include songs uploaded by the current user
+            const userUploadedSongs = allSongs.items.filter(song => 
+              song.uploadedBy === member?.loginEmail || 
+              song.uploadedBy === (member as any)?._id
+            );
+            
             const playlistSongs = songIds.map(songId => 
-              allSongs.items.find(song => song._id === songId.trim())
+              userUploadedSongs.find(song => song._id === songId.trim())
             ).filter(Boolean) as Songs[];
             setSongs(playlistSongs);
           } else {
