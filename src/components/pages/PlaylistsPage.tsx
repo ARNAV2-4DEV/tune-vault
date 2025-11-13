@@ -6,7 +6,10 @@ import { Playlists } from '@/entities';
 import { Image } from '@/components/ui/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Play, Music, Calendar, ArrowLeft, Lock, Globe } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Play, Music, Calendar, ArrowLeft, Lock, Globe, MoreVertical, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useMember } from '@/integrations';
 
@@ -14,6 +17,21 @@ export default function PlaylistsPage() {
   const { member } = useMember();
   const [playlists, setPlaylists] = useState<Playlists[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingPlaylistId, setDeletingPlaylistId] = useState<string | null>(null);
+
+  const handleDeletePlaylist = async (playlistId: string) => {
+    try {
+      setDeletingPlaylistId(playlistId);
+      await BaseCrudService.delete('playlists', playlistId);
+      
+      // Remove the deleted playlist from the local state
+      setPlaylists(prev => prev.filter(playlist => playlist._id !== playlistId));
+    } catch (error) {
+      console.error('Error deleting playlist:', error);
+    } finally {
+      setDeletingPlaylistId(null);
+    }
+  };
 
   useEffect(() => {
     const fetchPlaylists = async () => {
@@ -92,7 +110,9 @@ export default function PlaylistsPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
+              className="relative group"
             >
+              {/* Playlist Card */}
               <Link to={`/playlist/${playlist._id}`}>
                 <Card className="bg-white/5 border-white/10 backdrop-blur-sm hover:bg-white/10 transition-all duration-300 group h-full">
                   <CardContent className="p-6">
@@ -159,6 +179,44 @@ export default function PlaylistsPage() {
                   </CardContent>
                 </Card>
               </Link>
+
+              {/* Delete Button */}
+              <div className="absolute top-3 left-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="bg-black/60 hover:bg-destructive hover:text-destructive-foreground text-white backdrop-blur-sm"
+                      onClick={(e) => e.preventDefault()}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-deep-space-blue border-white/20">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-foreground font-heading">
+                        Delete Playlist
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="text-foreground/70 font-paragraph">
+                        Are you sure you want to delete "{playlist.playlistName}"? This action cannot be undone and will permanently remove the playlist and all its songs.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="border-white/20 text-foreground hover:bg-white/10 font-paragraph">
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleDeletePlaylist(playlist._id)}
+                        disabled={deletingPlaylistId === playlist._id}
+                        className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-paragraph"
+                      >
+                        {deletingPlaylistId === playlist._id ? 'Deleting...' : 'Delete Playlist'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             </motion.div>
           ))}
         </div>
