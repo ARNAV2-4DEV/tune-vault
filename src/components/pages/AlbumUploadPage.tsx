@@ -217,7 +217,9 @@ export default function AlbumUploadPage() {
   const simulateFileUpload = async (file: File): Promise<string> => {
     // Simulate file upload with progress
     await new Promise(resolve => setTimeout(resolve, 500));
-    return `https://static.wixstatic.com/media/audio_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.mp3`;
+    // Return a working demo audio file URL for testing
+    // In a real app, this would upload the actual file and return its URL
+    return 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
   };
 
   const handleFinalUpload = async () => {

@@ -72,8 +72,11 @@ export function MusicPlayer() {
     };
 
     const handleCanPlay = () => {
+      console.log('Audio can play, isPlaying:', isPlaying);
       if (isPlaying) {
-        audio.play().catch(console.error);
+        audio.play().catch(error => {
+          console.error('Error in canplay handler:', error);
+        });
       }
     };
 
@@ -96,19 +99,44 @@ export function MusicPlayer() {
     if (!audio) return;
 
     if (isPlaying) {
-      audio.play().catch(console.error);
+      console.log('Attempting to play audio:', currentSong?.title);
+      audio.play().catch(error => {
+        console.error('Error playing audio:', error);
+        console.error('Audio source:', audio.src);
+        console.error('Audio readyState:', audio.readyState);
+        console.error('Audio networkState:', audio.networkState);
+      });
     } else {
       audio.pause();
     }
-  }, [isPlaying]);
+  }, [isPlaying, currentSong]);
 
   // Handle song changes
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !currentSong?.audioFile) return;
 
+    console.log('Loading audio file:', currentSong.audioFile);
     audio.src = currentSong.audioFile;
     audio.load();
+    
+    // Add error handling for audio loading
+    const handleError = (e: Event) => {
+      console.error('Audio loading error:', e);
+      console.error('Failed to load audio file:', currentSong.audioFile);
+    };
+    
+    const handleCanPlayThrough = () => {
+      console.log('Audio can play through:', currentSong.audioFile);
+    };
+    
+    audio.addEventListener('error', handleError);
+    audio.addEventListener('canplaythrough', handleCanPlayThrough);
+    
+    return () => {
+      audio.removeEventListener('error', handleError);
+      audio.removeEventListener('canplaythrough', handleCanPlayThrough);
+    };
   }, [currentSong]);
 
   // Handle volume changes

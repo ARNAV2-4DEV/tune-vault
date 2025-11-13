@@ -73,8 +73,9 @@ export default function UploadPage() {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    // Return a mock URL for the uploaded file
-    return `https://static.wixstatic.com/media/audio_${Date.now()}.mp3`;
+    // Return a working demo audio file URL for testing
+    // In a real app, this would upload the actual file and return its URL
+    return 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
