@@ -2,27 +2,46 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { BaseCrudService } from '@/integrations';
-import { Songs } from '@/entities';
+import { Songs, Playlists } from '@/entities';
 import { Image } from '@/components/ui/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Play, Clock, TrendingUp, ArrowLeft, Search, Music } from 'lucide-react';
+import { Play, Pause, Clock, TrendingUp, ArrowLeft, Search, Music, Plus, CheckCircle } from 'lucide-react';
+import { useMusicPlayer } from '@/stores/musicPlayerStore';
+import { useMember } from '@/integrations';
+import { AddToPlaylist } from '@/components/ui/add-to-playlist';
 
 export default function TopChartsPage() {
+  const { member } = useMember();
   const [songs, setSongs] = useState<Songs[]>([]);
   const [filteredSongs, setFilteredSongs] = useState<Songs[]>([]);
+  const [playlists, setPlaylists] = useState<Playlists[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [addToQueueFeedback, setAddToQueueFeedback] = useState<string | null>(null);
+  const [addToPlaylistFeedback, setAddToPlaylistFeedback] = useState<string | null>(null);
+
+  const { 
+    currentSong, 
+    isPlaying, 
+    playSong, 
+    pauseSong, 
+    resumeSong, 
+    addToQueue 
+  } = useMusicPlayer();
 
   useEffect(() => {
     const fetchSongs = async () => {
       try {
-        const { items } = await BaseCrudService.getAll<Songs>('songs');
+        const [songsResponse, playlistsResponse] = await Promise.all([
+          BaseCrudService.getAll<Songs>('songs'),
+          BaseCrudService.getAll<Playlists>('playlists')
+        ]);
         
         // Filter only user-uploaded songs and sort by upload date (newest first)
-        const userSongs = items
+        const userSongs = songsResponse.items
           .filter(song => song.uploadedBy) // Only show user-uploaded songs
           .sort((a, b) => {
             const dateA = new Date(b.uploadDate || b._createdDate || 0);
@@ -32,6 +51,17 @@ export default function TopChartsPage() {
         
         setSongs(userSongs);
         setFilteredSongs(userSongs);
+
+        // Filter playlists for current user if logged in
+        if (member) {
+          const userPlaylists = playlistsResponse.items.filter(playlist => 
+            playlist.uploadedBy === member.loginEmail || 
+            playlist.uploadedBy === (member as any)._id ||
+            playlist.creator === member.loginEmail ||
+            playlist.creator === (member as any)._id
+          );
+          setPlaylists(userPlaylists);
+        }
       } catch (error) {
         console.error('Error fetching songs:', error);
       } finally {
@@ -40,7 +70,7 @@ export default function TopChartsPage() {
     };
 
     fetchSongs();
-  }, []);
+  }, [member]);
 
   useEffect(() => {
     if (!searchQuery) {
@@ -55,6 +85,30 @@ export default function TopChartsPage() {
       setFilteredSongs(filtered);
     }
   }, [searchQuery, songs]);
+
+  const handlePlaySong = (song: Songs) => {
+    if (currentSong?._id === song._id) {
+      if (isPlaying) {
+        pauseSong();
+      } else {
+        resumeSong();
+      }
+    } else {
+      playSong(song, filteredSongs);
+    }
+  };
+
+  const handleAddToQueue = (song: Songs) => {
+    try {
+      addToQueue(song);
+      setAddToQueueFeedback(`Added "${song.title}" to queue`);
+      setTimeout(() => setAddToQueueFeedback(null), 3000);
+    } catch (error) {
+      console.error('Error adding song to queue:', error);
+      setAddToQueueFeedback('Failed to add song to queue');
+      setTimeout(() => setAddToQueueFeedback(null), 3000);
+    }
+  };
 
   const formatDuration = (seconds?: number) => {
     if (!seconds) return 'Unknown';
@@ -98,6 +152,24 @@ export default function TopChartsPage() {
       </div>
 
       <div className="max-w-[120rem] mx-auto px-8 py-12">
+        {/* Feedback Messages */}
+        {(addToQueueFeedback || addToPlaylistFeedback) && (
+          <div className="mb-4">
+            {addToQueueFeedback && (
+              <div className="bg-neon-teal/20 border border-neon-teal/50 text-neon-teal px-4 py-2 rounded-lg mb-2 flex items-center">
+                <CheckCircle className="h-4 w-4 mr-2" />
+                {addToQueueFeedback}
+              </div>
+            )}
+            {addToPlaylistFeedback && (
+              <div className="bg-neon-teal/20 border border-neon-teal/50 text-neon-teal px-4 py-2 rounded-lg mb-2 flex items-center">
+                <CheckCircle className="h-4 w-4 mr-2" />
+                {addToPlaylistFeedback}
+              </div>
+            )}
+          </div>
+        )}
+
         {songs.length === 0 ? (
           /* Empty State */
           <div className="text-center py-12">
@@ -157,8 +229,15 @@ export default function TopChartsPage() {
                             className="w-16 h-16 object-cover rounded-lg"
                             width={64}
                           />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex items-center justify-center">
-                            <Play className="h-6 w-6 text-neon-teal" />
+                          <div 
+                            className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex items-center justify-center cursor-pointer"
+                            onClick={() => handlePlaySong(song)}
+                          >
+                            {currentSong?._id === song._id && isPlaying ? (
+                              <Pause className="h-6 w-6 text-neon-teal" />
+                            ) : (
+                              <Play className="h-6 w-6 text-neon-teal" />
+                            )}
                           </div>
                         </div>
 
@@ -192,6 +271,41 @@ export default function TopChartsPage() {
 
                         {/* Actions */}
                         <div className="flex items-center gap-3">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddToQueue(song)}
+                            className="hover:bg-neon-teal/20"
+                            title="Add to Queue"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                          
+                          {member && (
+                            <AddToPlaylist
+                              song={song}
+                              playlists={playlists}
+                              onPlaylistUpdate={() => {
+                                // Refresh playlists after update
+                                const fetchPlaylists = async () => {
+                                  const playlistsResponse = await BaseCrudService.getAll<Playlists>('playlists');
+                                  const userPlaylists = playlistsResponse.items.filter(playlist => 
+                                    playlist.uploadedBy === member.loginEmail || 
+                                    playlist.uploadedBy === (member as any)._id ||
+                                    playlist.creator === member.loginEmail ||
+                                    playlist.creator === (member as any)._id
+                                  );
+                                  setPlaylists(userPlaylists);
+                                };
+                                fetchPlaylists();
+                              }}
+                              onFeedback={(message) => {
+                                setAddToPlaylistFeedback(message);
+                                setTimeout(() => setAddToPlaylistFeedback(null), 3000);
+                              }}
+                            />
+                          )}
+                          
                           <Link to={`/song/${song._id}`}>
                             <Button size="sm" className="bg-neon-teal text-black hover:bg-neon-teal/90">
                               View Details

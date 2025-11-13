@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import { Music, Search, Upload, Play, Clock, Calendar, Trash2, Disc, Pause, Plus, List, Grid, MoreVertical, ListMusic, Trash, CheckCircle, FolderOpen } from 'lucide-react';
 import { format } from 'date-fns';
 import { useMusicPlayer } from '@/stores/musicPlayerStore';
+import { AddToPlaylist } from '@/components/ui/add-to-playlist';
 
 export default function MyMusicPage() {
   const { member } = useMember();
@@ -494,31 +495,28 @@ export default function MyMusicPage() {
                             <Plus className="h-4 w-4" />
                           </Button>
                           
-                          {playlists.length > 0 && (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="hover:bg-secondary/20"
-                                  title="Add to Playlist"
-                                >
-                                  <ListMusic className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent className="bg-deep-space-blue border-white/20">
-                                {playlists.map((playlist) => (
-                                  <DropdownMenuItem
-                                    key={playlist._id}
-                                    onClick={() => handleAddToPlaylist(song, playlist._id)}
-                                    className="text-foreground hover:bg-white/10 cursor-pointer"
-                                  >
-                                    {playlist.playlistName}
-                                  </DropdownMenuItem>
-                                ))}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
+                          <AddToPlaylist
+                            song={song}
+                            playlists={playlists}
+                            onPlaylistUpdate={() => {
+                              // Refresh playlists after update
+                              const fetchPlaylists = async () => {
+                                const playlistsResponse = await BaseCrudService.getAll<Playlists>('playlists');
+                                const userPlaylists = playlistsResponse.items.filter(playlist => 
+                                  playlist.uploadedBy === member?.loginEmail || 
+                                  playlist.uploadedBy === (member as any)?._id ||
+                                  playlist.creator === member?.loginEmail ||
+                                  playlist.creator === (member as any)?._id
+                                );
+                                setPlaylists(userPlaylists);
+                              };
+                              fetchPlaylists();
+                            }}
+                            onFeedback={(message) => {
+                              setAddToPlaylistFeedback(message);
+                              setTimeout(() => setAddToPlaylistFeedback(null), 3000);
+                            }}
+                          />
                           
                           <Button
                             variant="ghost"
@@ -572,31 +570,31 @@ export default function MyMusicPage() {
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
-                          {playlists.length > 0 && (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  className="border-white/50 text-white hover:bg-white/20"
-                                  title="Add to Playlist"
-                                >
-                                  <ListMusic className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent className="bg-deep-space-blue border-white/20">
-                                {playlists.map((playlist) => (
-                                  <DropdownMenuItem
-                                    key={playlist._id}
-                                    onClick={() => handleAddToPlaylist(song, playlist._id)}
-                                    className="text-foreground hover:bg-white/10 cursor-pointer"
-                                  >
-                                    {playlist.playlistName}
-                                  </DropdownMenuItem>
-                                ))}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
+                          <AddToPlaylist
+                            song={song}
+                            playlists={playlists}
+                            variant="button"
+                            size="sm"
+                            className="border-white/50 text-white hover:bg-white/20"
+                            onPlaylistUpdate={() => {
+                              // Refresh playlists after update
+                              const fetchPlaylists = async () => {
+                                const playlistsResponse = await BaseCrudService.getAll<Playlists>('playlists');
+                                const userPlaylists = playlistsResponse.items.filter(playlist => 
+                                  playlist.uploadedBy === member?.loginEmail || 
+                                  playlist.uploadedBy === (member as any)?._id ||
+                                  playlist.creator === member?.loginEmail ||
+                                  playlist.creator === (member as any)?._id
+                                );
+                                setPlaylists(userPlaylists);
+                              };
+                              fetchPlaylists();
+                            }}
+                            onFeedback={(message) => {
+                              setAddToPlaylistFeedback(message);
+                              setTimeout(() => setAddToPlaylistFeedback(null), 3000);
+                            }}
+                          />
                         </div>
                         <Button
                           size="sm"

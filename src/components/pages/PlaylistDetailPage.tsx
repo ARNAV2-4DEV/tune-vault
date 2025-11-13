@@ -13,15 +13,18 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
 import { useMusicPlayer } from '@/stores/musicPlayerStore';
 import { useMember } from '@/integrations';
+import { AddToPlaylist } from '@/components/ui/add-to-playlist';
 
 export default function PlaylistDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { member } = useMember();
   const [playlist, setPlaylist] = useState<Playlists | null>(null);
   const [songs, setSongs] = useState<Songs[]>([]);
+  const [allPlaylists, setAllPlaylists] = useState<Playlists[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [canEdit, setCanEdit] = useState(false);
+  const [addToPlaylistFeedback, setAddToPlaylistFeedback] = useState<string | null>(null);
 
   const { 
     currentSong, 
@@ -76,6 +79,16 @@ export default function PlaylistDetailPage() {
         } else {
           setSongs([]);
         }
+
+        // Fetch all user playlists for the "Add to Playlist" feature
+        const playlistsResponse = await BaseCrudService.getAll<Playlists>('playlists');
+        const userPlaylists = playlistsResponse.items.filter(p => 
+          p.uploadedBy === member?.loginEmail || 
+          p.uploadedBy === (member as any)?._id ||
+          p.creator === member?.loginEmail ||
+          p.creator === (member as any)?._id
+        );
+        setAllPlaylists(userPlaylists);
       } catch (error) {
         console.error('Error fetching playlist:', error);
         setError('Failed to load playlist');
@@ -301,6 +314,16 @@ export default function PlaylistDetailPage() {
 
       {/* Songs List */}
       <div className="max-w-[120rem] mx-auto px-8 py-12">
+        {/* Feedback Messages */}
+        {addToPlaylistFeedback && (
+          <div className="mb-4">
+            <div className="bg-neon-teal/20 border border-neon-teal/50 text-neon-teal px-4 py-2 rounded-lg flex items-center">
+              <Plus className="h-4 w-4 mr-2" />
+              {addToPlaylistFeedback}
+            </div>
+          </div>
+        )}
+
         {songs.length === 0 ? (
           <div className="text-center py-16">
             <Music className="h-16 w-16 text-foreground/30 mx-auto mb-4" />
@@ -417,6 +440,29 @@ export default function PlaylistDetailPage() {
                                   >
                                     <Plus className="h-4 w-4" />
                                   </Button>
+                                  
+                                  <AddToPlaylist
+                                    song={song}
+                                    playlists={allPlaylists.filter(p => p._id !== playlist?._id)} // Exclude current playlist
+                                    onPlaylistUpdate={() => {
+                                      // Refresh playlists after update
+                                      const fetchPlaylists = async () => {
+                                        const playlistsResponse = await BaseCrudService.getAll<Playlists>('playlists');
+                                        const userPlaylists = playlistsResponse.items.filter(p => 
+                                          p.uploadedBy === member?.loginEmail || 
+                                          p.uploadedBy === (member as any)?._id ||
+                                          p.creator === member?.loginEmail ||
+                                          p.creator === (member as any)?._id
+                                        );
+                                        setAllPlaylists(userPlaylists);
+                                      };
+                                      fetchPlaylists();
+                                    }}
+                                    onFeedback={(message) => {
+                                      setAddToPlaylistFeedback(message);
+                                      setTimeout(() => setAddToPlaylistFeedback(null), 3000);
+                                    }}
+                                  />
                                   
                                   {canEdit && (
                                     <Button

@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { useMember } from '@/integrations';
 import { BaseCrudService } from '@/integrations';
-import { Songs } from '@/entities';
+import { Songs, Playlists } from '@/entities';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -302,6 +302,7 @@ export default function FolderUploadPage() {
 
     try {
       const totalSongs = songs.length;
+      const songIds: string[] = []; // Track created song IDs for playlist
       
       for (let i = 0; i < songs.length; i++) {
         const song = songs[i];
@@ -318,8 +319,9 @@ export default function FolderUploadPage() {
         }
         
         // Create song record in CMS
+        const songId = crypto.randomUUID();
         const newSong: Partial<Songs> = {
-          _id: crypto.randomUUID(),
+          _id: songId,
           title: song.title,
           artistName: song.artist || 'Unknown Artist',
           albumName: song.album || folderData.folderName,
@@ -334,7 +336,28 @@ export default function FolderUploadPage() {
         };
 
         await BaseCrudService.create('songs', newSong as any);
+        songIds.push(songId);
       }
+      
+      // Create playlist/album from the folder
+      const playlistId = crypto.randomUUID();
+      const albumCoverUrl = songs.find(s => s.imageFile) ? 
+        URL.createObjectURL(songs.find(s => s.imageFile)!.imageFile!.file) : 
+        undefined;
+      
+      const newPlaylist: Partial<Playlists> = {
+        _id: playlistId,
+        playlistName: folderData.folderName,
+        description: `Album created from folder upload - ${songs.length} tracks`,
+        songs: songIds.join(','),
+        coverImage: albumCoverUrl,
+        creator: member?.loginEmail || (member as any)?._id || 'unknown',
+        uploadedBy: member?.loginEmail || (member as any)?._id || 'unknown',
+        isPublic: false,
+        creationDate: new Date()
+      };
+      
+      await BaseCrudService.create('playlists', newPlaylist as any);
       
       setUploadProgress(100);
       setUploadStatus('success');
