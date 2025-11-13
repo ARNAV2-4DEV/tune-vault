@@ -25,6 +25,8 @@ export interface Playlists {
   isPublic?: boolean;
   /** @wixFieldType date */
   creationDate?: Date | string;
+  /** @wixFieldType text */
+  songs?: string;
 }
 
 

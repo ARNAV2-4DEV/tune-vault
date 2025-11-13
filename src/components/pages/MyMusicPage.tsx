@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useMember } from '@/integrations';
 import { BaseCrudService } from '@/integrations';
-import { Songs } from '@/entities';
+import { Songs, Playlists } from '@/entities';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Image } from '@/components/ui/image';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Link } from 'react-router-dom';
-import { Music, Search, Upload, Play, Clock, Calendar, Trash2, Disc, Pause, Plus, List, Grid, SkipForward, SkipBack, Volume2 } from 'lucide-react';
+import { Music, Search, Upload, Play, Clock, Calendar, Trash2, Disc, Pause, Plus, List, Grid, MoreVertical, ListMusic, Trash, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useMusicPlayer } from '@/stores/musicPlayerStore';
 
@@ -16,9 +18,13 @@ export default function MyMusicPage() {
   const { member } = useMember();
   const [songs, setSongs] = useState<Songs[]>([]);
   const [filteredSongs, setFilteredSongs] = useState<Songs[]>([]);
+  const [playlists, setPlaylists] = useState<Playlists[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [addToQueueFeedback, setAddToQueueFeedback] = useState<string | null>(null);
+  const [addToPlaylistFeedback, setAddToPlaylistFeedback] = useState<string | null>(null);
   
   const { 
     currentSong, 
@@ -35,6 +41,7 @@ export default function MyMusicPage() {
       if (!member?.loginEmail && !(member as any)?._id) return;
       
       try {
+        // Fetch songs
         const { items } = await BaseCrudService.getAll<Songs>('songs');
         
         // Filter songs uploaded by current user
@@ -52,6 +59,16 @@ export default function MyMusicPage() {
         
         setSongs(sortedSongs);
         setFilteredSongs(sortedSongs);
+
+        // Fetch playlists for current user
+        const playlistsResponse = await BaseCrudService.getAll<Playlists>('playlists');
+        const userPlaylists = playlistsResponse.items.filter(playlist => 
+          playlist.uploadedBy === member.loginEmail || 
+          playlist.uploadedBy === (member as any)._id ||
+          playlist.creator === member.loginEmail ||
+          playlist.creator === (member as any)._id
+        );
+        setPlaylists(userPlaylists);
       } catch (error) {
         console.error('Error fetching user songs:', error);
       } finally {
@@ -89,7 +106,56 @@ export default function MyMusicPage() {
   };
 
   const handleAddToQueue = (song: Songs) => {
-    addToQueue(song);
+    try {
+      addToQueue(song);
+      setAddToQueueFeedback(`Added "${song.title}" to queue`);
+      setTimeout(() => setAddToQueueFeedback(null), 3000);
+    } catch (error) {
+      console.error('Error adding song to queue:', error);
+      setAddToQueueFeedback('Failed to add song to queue');
+      setTimeout(() => setAddToQueueFeedback(null), 3000);
+    }
+  };
+
+  const handleAddToPlaylist = async (song: Songs, playlistId: string) => {
+    try {
+      const playlist = playlists.find(p => p._id === playlistId);
+      if (!playlist) {
+        throw new Error('Playlist not found');
+      }
+
+      // Get current songs in playlist (if any)
+      const currentSongs = playlist.songs ? playlist.songs.split(',').filter(id => id.trim()) : [];
+      
+      // Check if song is already in playlist
+      if (currentSongs.includes(song._id)) {
+        setAddToPlaylistFeedback(`"${song.title}" is already in "${playlist.playlistName}"`);
+        setTimeout(() => setAddToPlaylistFeedback(null), 3000);
+        return;
+      }
+
+      // Add song to playlist
+      const updatedSongs = [...currentSongs, song._id].join(',');
+      
+      await BaseCrudService.update('playlists', {
+        _id: playlistId,
+        songs: updatedSongs
+      });
+
+      // Update local playlists state
+      setPlaylists(prev => prev.map(p => 
+        p._id === playlistId 
+          ? { ...p, songs: updatedSongs }
+          : p
+      ));
+
+      setAddToPlaylistFeedback(`Added "${song.title}" to "${playlist.playlistName}"`);
+      setTimeout(() => setAddToPlaylistFeedback(null), 3000);
+    } catch (error) {
+      console.error('Error adding song to playlist:', error);
+      setAddToPlaylistFeedback('Failed to add song to playlist');
+      setTimeout(() => setAddToPlaylistFeedback(null), 3000);
+    }
   };
 
   const handlePlayAll = () => {
@@ -97,6 +163,27 @@ export default function MyMusicPage() {
       playSong(filteredSongs[0], filteredSongs);
     }
   };
+  const handleDeleteAllSongs = async () => {
+    if (songs.length === 0) return;
+    
+    setIsDeleting(true);
+    try {
+      // Delete all user songs from the database
+      const deletePromises = songs.map(song => BaseCrudService.delete('songs', song._id));
+      await Promise.all(deletePromises);
+      
+      // Clear local state
+      setSongs([]);
+      setFilteredSongs([]);
+      
+      console.log(`Successfully deleted ${songs.length} songs`);
+    } catch (error) {
+      console.error('Error deleting all songs:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleDeleteSong = async (songId: string) => {
     if (!confirm('Are you sure you want to delete this song?')) return;
     
@@ -190,6 +277,24 @@ export default function MyMusicPage() {
           </Card>
         ) : (
           <>
+            {/* Feedback Messages */}
+            {(addToQueueFeedback || addToPlaylistFeedback) && (
+              <div className="mb-4">
+                {addToQueueFeedback && (
+                  <div className="bg-neon-teal/20 border border-neon-teal/50 text-neon-teal px-4 py-2 rounded-lg mb-2 flex items-center">
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {addToQueueFeedback}
+                  </div>
+                )}
+                {addToPlaylistFeedback && (
+                  <div className="bg-neon-teal/20 border border-neon-teal/50 text-neon-teal px-4 py-2 rounded-lg mb-2 flex items-center">
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {addToPlaylistFeedback}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Controls Bar */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-4">
@@ -207,6 +312,41 @@ export default function MyMusicPage() {
               </div>
               
               <div className="flex items-center space-x-2">
+                {songs.length > 0 && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-red-500/50 text-red-400 hover:bg-red-500/20"
+                      >
+                        <Trash className="h-4 w-4 mr-2" />
+                        Delete All
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-deep-space-blue border-white/20">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-foreground font-heading">Delete All Songs</AlertDialogTitle>
+                        <AlertDialogDescription className="text-foreground/70 font-paragraph">
+                          Are you sure you want to delete all {songs.length} songs? This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="border-white/20 text-foreground hover:bg-white/5">
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={handleDeleteAllSongs}
+                          disabled={isDeleting}
+                          className="bg-red-500 hover:bg-red-600 text-white"
+                        >
+                          {isDeleting ? 'Deleting...' : 'Delete All'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+                
                 <Button
                   variant="outline"
                   size="sm"
@@ -317,14 +457,43 @@ export default function MyMusicPage() {
                             size="sm"
                             onClick={() => handleAddToQueue(song)}
                             className="hover:bg-neon-teal/20"
+                            title="Add to Queue"
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
+                          
+                          {playlists.length > 0 && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="hover:bg-secondary/20"
+                                  title="Add to Playlist"
+                                >
+                                  <ListMusic className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent className="bg-deep-space-blue border-white/20">
+                                {playlists.map((playlist) => (
+                                  <DropdownMenuItem
+                                    key={playlist._id}
+                                    onClick={() => handleAddToPlaylist(song, playlist._id)}
+                                    className="text-foreground hover:bg-white/10 cursor-pointer"
+                                  >
+                                    {playlist.playlistName}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                          
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteSong(song._id)}
                             className="hover:bg-red-500/20 text-red-400"
+                            title="Delete Song"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -354,6 +523,7 @@ export default function MyMusicPage() {
                             size="sm" 
                             onClick={() => handlePlaySong(song)}
                             className="bg-neon-teal text-black hover:bg-neon-teal/90"
+                            title="Play Song"
                           >
                             {currentSong?._id === song._id && isPlaying ? (
                               <Pause className="h-4 w-4" />
@@ -366,9 +536,35 @@ export default function MyMusicPage() {
                             variant="outline"
                             onClick={() => handleAddToQueue(song)}
                             className="border-white/50 text-white hover:bg-white/20"
+                            title="Add to Queue"
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
+                          {playlists.length > 0 && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  className="border-white/50 text-white hover:bg-white/20"
+                                  title="Add to Playlist"
+                                >
+                                  <ListMusic className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent className="bg-deep-space-blue border-white/20">
+                                {playlists.map((playlist) => (
+                                  <DropdownMenuItem
+                                    key={playlist._id}
+                                    onClick={() => handleAddToPlaylist(song, playlist._id)}
+                                    className="text-foreground hover:bg-white/10 cursor-pointer"
+                                  >
+                                    {playlist.playlistName}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                         </div>
                         <Button
                           size="sm"
