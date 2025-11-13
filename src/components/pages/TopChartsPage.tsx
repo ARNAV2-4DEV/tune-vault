@@ -29,7 +29,9 @@ export default function TopChartsPage() {
     playSong, 
     pauseSong, 
     resumeSong, 
-    addToQueue 
+    addToQueue,
+    queue,
+    originalPlaylist
   } = useMusicPlayer();
 
   useEffect(() => {
@@ -199,6 +201,8 @@ export default function TopChartsPage() {
               </div>
               <div className="text-foreground/70 font-paragraph">
                 {filteredSongs.length} {filteredSongs.length === 1 ? 'song' : 'songs'} found
+                {queue.length > 0 && ` • ${queue.length} in queue`}
+                {originalPlaylist.length > 0 && ` • Playing from ${originalPlaylist.length} song playlist`}
               </div>
             </div>
 

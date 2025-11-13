@@ -34,7 +34,8 @@ export default function MyMusicPage() {
     pauseSong, 
     resumeSong, 
     addToQueue,
-    queue 
+    queue,
+    originalPlaylist
   } = useMusicPlayer();
 
   useEffect(() => {
@@ -341,6 +342,7 @@ export default function MyMusicPage() {
                 <div className="text-foreground/70 font-paragraph text-sm">
                   {filteredSongs.length} {filteredSongs.length === 1 ? 'song' : 'songs'}
                   {queue.length > 0 && ` • ${queue.length} in queue`}
+                  {originalPlaylist.length > 0 && ` • Playing from ${originalPlaylist.length} song playlist`}
                 </div>
               </div>
               

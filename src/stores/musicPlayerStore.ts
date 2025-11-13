@@ -9,9 +9,15 @@ interface MusicPlayerState {
   duration: number;
   volume: number;
   
-  // Queue management
+  // Queue management (priority queue - plays first)
   queue: Songs[];
-  currentIndex: number;
+  queueIndex: number; // Current position in queue
+  
+  // Original playlist management (plays after queue is empty)
+  originalPlaylist: Songs[];
+  originalPlaylistIndex: number; // Current position in original playlist
+  
+  // Player settings
   shuffle: boolean;
   repeat: 'none' | 'one' | 'all';
   
@@ -36,6 +42,11 @@ interface MusicPlayerState {
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
   setIsPlaying: (playing: boolean) => void;
+  
+  // Helper getters
+  isPlayingFromQueue: () => boolean;
+  getCurrentPlaylist: () => Songs[];
+  getCurrentIndex: () => number;
 }
 
 export const useMusicPlayer = create<MusicPlayerState>((set, get) => ({
@@ -45,46 +56,77 @@ export const useMusicPlayer = create<MusicPlayerState>((set, get) => ({
   currentTime: 0,
   duration: 0,
   volume: 1,
-  queue: [],
-  currentIndex: -1,
+  queue: [], // Priority queue - starts empty
+  queueIndex: -1,
+  originalPlaylist: [],
+  originalPlaylistIndex: -1,
   shuffle: false,
   repeat: 'none',
+
+  // Helper getters
+  isPlayingFromQueue: () => {
+    const state = get();
+    return state.queue.length > 0 && state.queueIndex >= 0 && state.queueIndex < state.queue.length;
+  },
+
+  getCurrentPlaylist: () => {
+    const state = get();
+    return state.isPlayingFromQueue() ? state.queue : state.originalPlaylist;
+  },
+
+  getCurrentIndex: () => {
+    const state = get();
+    return state.isPlayingFromQueue() ? state.queueIndex : state.originalPlaylistIndex;
+  },
 
   // Player actions
   playSong: (song: Songs, playlist?: Songs[]) => {
     const state = get();
     
     if (playlist) {
-      // If a playlist is provided, set it as the queue
+      // Playing from a playlist - set as original playlist
       const songIndex = playlist.findIndex(s => s._id === song._id);
       set({
         currentSong: song,
-        queue: playlist,
-        currentIndex: songIndex,
+        originalPlaylist: playlist,
+        originalPlaylistIndex: songIndex,
         isPlaying: true,
-        currentTime: 0
+        currentTime: 0,
+        // Don't clear queue - it should persist
       });
-    } else if (state.currentSong?._id === song._id) {
-      // If same song, just toggle play/pause
-      set({ isPlaying: !state.isPlaying });
     } else {
-      // New song, add to queue if not already there
-      const existingIndex = state.queue.findIndex(s => s._id === song._id);
-      if (existingIndex >= 0) {
+      // Playing a single song
+      // Check if song is in queue first
+      const queueIndex = state.queue.findIndex(s => s._id === song._id);
+      if (queueIndex >= 0) {
+        // Song is in queue, play from queue
         set({
           currentSong: song,
-          currentIndex: existingIndex,
+          queueIndex: queueIndex,
           isPlaying: true,
           currentTime: 0
         });
       } else {
-        set({
-          currentSong: song,
-          queue: [...state.queue, song],
-          currentIndex: state.queue.length,
-          isPlaying: true,
-          currentTime: 0
-        });
+        // Check if song is in original playlist
+        const playlistIndex = state.originalPlaylist.findIndex(s => s._id === song._id);
+        if (playlistIndex >= 0) {
+          // Song is in original playlist, play from there
+          set({
+            currentSong: song,
+            originalPlaylistIndex: playlistIndex,
+            isPlaying: true,
+            currentTime: 0
+          });
+        } else {
+          // Song not in any playlist, create a new single-song playlist
+          set({
+            currentSong: song,
+            originalPlaylist: [song],
+            originalPlaylistIndex: 0,
+            isPlaying: true,
+            currentTime: 0
+          });
+        }
       }
     }
   },
@@ -95,51 +137,114 @@ export const useMusicPlayer = create<MusicPlayerState>((set, get) => ({
 
   nextSong: () => {
     const state = get();
-    if (state.queue.length === 0) return;
-
-    let nextIndex = state.currentIndex + 1;
     
     if (state.repeat === 'one') {
       // Stay on current song
-      nextIndex = state.currentIndex;
-    } else if (nextIndex >= state.queue.length) {
-      if (state.repeat === 'all') {
-        nextIndex = 0;
-      } else {
-        // End of queue
-        set({ isPlaying: false });
-        return;
-      }
+      set({ currentTime: 0, isPlaying: true });
+      return;
     }
 
-    set({
-      currentSong: state.queue[nextIndex],
-      currentIndex: nextIndex,
-      currentTime: 0,
-      isPlaying: true
-    });
+    // Check if we're playing from queue
+    if (state.isPlayingFromQueue()) {
+      const nextQueueIndex = state.queueIndex + 1;
+      
+      if (nextQueueIndex < state.queue.length) {
+        // Play next song in queue
+        set({
+          currentSong: state.queue[nextQueueIndex],
+          queueIndex: nextQueueIndex,
+          currentTime: 0,
+          isPlaying: true
+        });
+      } else {
+        // Queue finished, switch to original playlist
+        if (state.originalPlaylist.length > 0) {
+          // Resume from where we left off in original playlist, or start from beginning
+          const resumeIndex = Math.max(0, state.originalPlaylistIndex);
+          set({
+            currentSong: state.originalPlaylist[resumeIndex],
+            originalPlaylistIndex: resumeIndex,
+            queueIndex: -1, // No longer playing from queue
+            currentTime: 0,
+            isPlaying: true
+          });
+        } else {
+          // No original playlist, stop playing
+          set({ isPlaying: false });
+        }
+      }
+    } else {
+      // Playing from original playlist
+      const nextPlaylistIndex = state.originalPlaylistIndex + 1;
+      
+      if (nextPlaylistIndex < state.originalPlaylist.length) {
+        // Play next song in original playlist
+        set({
+          currentSong: state.originalPlaylist[nextPlaylistIndex],
+          originalPlaylistIndex: nextPlaylistIndex,
+          currentTime: 0,
+          isPlaying: true
+        });
+      } else if (state.repeat === 'all') {
+        // Repeat playlist from beginning
+        set({
+          currentSong: state.originalPlaylist[0],
+          originalPlaylistIndex: 0,
+          currentTime: 0,
+          isPlaying: true
+        });
+      } else {
+        // End of playlist
+        set({ isPlaying: false });
+      }
+    }
   },
 
   previousSong: () => {
     const state = get();
-    if (state.queue.length === 0) return;
-
-    let prevIndex = state.currentIndex - 1;
     
-    if (prevIndex < 0) {
-      if (state.repeat === 'all') {
-        prevIndex = state.queue.length - 1;
+    // Check if we're playing from queue
+    if (state.isPlayingFromQueue()) {
+      const prevQueueIndex = state.queueIndex - 1;
+      
+      if (prevQueueIndex >= 0) {
+        // Play previous song in queue
+        set({
+          currentSong: state.queue[prevQueueIndex],
+          queueIndex: prevQueueIndex,
+          currentTime: 0,
+          isPlaying: true
+        });
       } else {
-        prevIndex = 0;
+        // At beginning of queue, stay at first song
+        set({ currentTime: 0, isPlaying: true });
+      }
+    } else {
+      // Playing from original playlist
+      const prevPlaylistIndex = state.originalPlaylistIndex - 1;
+      
+      if (prevPlaylistIndex >= 0) {
+        // Play previous song in original playlist
+        set({
+          currentSong: state.originalPlaylist[prevPlaylistIndex],
+          originalPlaylistIndex: prevPlaylistIndex,
+          currentTime: 0,
+          isPlaying: true
+        });
+      } else if (state.repeat === 'all') {
+        // Go to last song in playlist
+        const lastIndex = state.originalPlaylist.length - 1;
+        set({
+          currentSong: state.originalPlaylist[lastIndex],
+          originalPlaylistIndex: lastIndex,
+          currentTime: 0,
+          isPlaying: true
+        });
+      } else {
+        // At beginning of playlist, restart current song
+        set({ currentTime: 0, isPlaying: true });
       }
     }
-
-    set({
-      currentSong: state.queue[prevIndex],
-      currentIndex: prevIndex,
-      currentTime: 0,
-      isPlaying: true
-    });
   },
 
   seekTo: (time: number) => set({ currentTime: time }),
@@ -152,34 +257,52 @@ export const useMusicPlayer = create<MusicPlayerState>((set, get) => ({
     const existingIndex = state.queue.findIndex(s => s._id === song._id);
     
     if (existingIndex === -1) {
+      // Add song to end of queue
       set({ queue: [...state.queue, song] });
     }
   },
 
   removeFromQueue: (index: number) => {
     const state = get();
-    const newQueue = state.queue.filter((_, i) => i !== index);
-    let newCurrentIndex = state.currentIndex;
+    if (index < 0 || index >= state.queue.length) return;
     
-    if (index < state.currentIndex) {
-      newCurrentIndex = state.currentIndex - 1;
-    } else if (index === state.currentIndex) {
-      // Removing current song
+    const newQueue = state.queue.filter((_, i) => i !== index);
+    let newQueueIndex = state.queueIndex;
+    
+    if (index < state.queueIndex) {
+      // Removed song was before current, adjust index
+      newQueueIndex = state.queueIndex - 1;
+    } else if (index === state.queueIndex) {
+      // Removing currently playing song from queue
       if (newQueue.length === 0) {
-        set({
-          queue: [],
-          currentSong: null,
-          currentIndex: -1,
-          isPlaying: false
-        });
+        // Queue is now empty, switch to original playlist if available
+        if (state.originalPlaylist.length > 0) {
+          const resumeIndex = Math.max(0, state.originalPlaylistIndex);
+          set({
+            queue: newQueue,
+            queueIndex: -1,
+            currentSong: state.originalPlaylist[resumeIndex],
+            originalPlaylistIndex: resumeIndex,
+            currentTime: 0
+          });
+        } else {
+          // No original playlist, stop playing
+          set({
+            queue: newQueue,
+            queueIndex: -1,
+            currentSong: null,
+            isPlaying: false,
+            currentTime: 0
+          });
+        }
         return;
       } else {
-        // Play next song or first if was last
-        newCurrentIndex = Math.min(state.currentIndex, newQueue.length - 1);
+        // Play next song in queue, or first if was last
+        newQueueIndex = Math.min(state.queueIndex, newQueue.length - 1);
         set({
           queue: newQueue,
-          currentSong: newQueue[newCurrentIndex],
-          currentIndex: newCurrentIndex,
+          queueIndex: newQueueIndex,
+          currentSong: newQueue[newQueueIndex],
           currentTime: 0
         });
         return;
@@ -188,36 +311,75 @@ export const useMusicPlayer = create<MusicPlayerState>((set, get) => ({
     
     set({
       queue: newQueue,
-      currentIndex: newCurrentIndex
+      queueIndex: newQueueIndex
     });
   },
 
-  clearQueue: () => set({
-    queue: [],
-    currentSong: null,
-    currentIndex: -1,
-    isPlaying: false,
-    currentTime: 0
-  }),
+  clearQueue: () => {
+    const state = get();
+    
+    if (state.isPlayingFromQueue()) {
+      // Currently playing from queue, switch to original playlist
+      if (state.originalPlaylist.length > 0) {
+        const resumeIndex = Math.max(0, state.originalPlaylistIndex);
+        set({
+          queue: [],
+          queueIndex: -1,
+          currentSong: state.originalPlaylist[resumeIndex],
+          originalPlaylistIndex: resumeIndex,
+          currentTime: 0
+        });
+      } else {
+        // No original playlist, stop playing
+        set({
+          queue: [],
+          queueIndex: -1,
+          currentSong: null,
+          isPlaying: false,
+          currentTime: 0
+        });
+      }
+    } else {
+      // Not playing from queue, just clear it
+      set({
+        queue: [],
+        queueIndex: -1
+      });
+    }
+  },
 
   shuffleQueue: () => {
     const state = get();
     if (state.queue.length <= 1) return;
 
-    const currentSong = state.currentSong;
-    const otherSongs = state.queue.filter(song => song._id !== currentSong?._id);
+    const currentSong = state.isPlayingFromQueue() ? state.currentSong : null;
+    let newQueue = [...state.queue];
+    let newQueueIndex = state.queueIndex;
     
-    // Fisher-Yates shuffle
-    for (let i = otherSongs.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [otherSongs[i], otherSongs[j]] = [otherSongs[j], otherSongs[i]];
+    if (currentSong) {
+      // Remove current song from shuffle, add it back at the beginning
+      newQueue = state.queue.filter(song => song._id !== currentSong._id);
+      
+      // Fisher-Yates shuffle for remaining songs
+      for (let i = newQueue.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newQueue[i], newQueue[j]] = [newQueue[j], newQueue[i]];
+      }
+      
+      // Put current song at the beginning
+      newQueue = [currentSong, ...newQueue];
+      newQueueIndex = 0;
+    } else {
+      // Fisher-Yates shuffle entire queue
+      for (let i = newQueue.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newQueue[i], newQueue[j]] = [newQueue[j], newQueue[i]];
+      }
     }
-
-    const newQueue = currentSong ? [currentSong, ...otherSongs] : otherSongs;
     
     set({
       queue: newQueue,
-      currentIndex: currentSong ? 0 : -1,
+      queueIndex: newQueueIndex,
       shuffle: !state.shuffle
     });
   },
@@ -233,23 +395,23 @@ export const useMusicPlayer = create<MusicPlayerState>((set, get) => ({
     const [movedItem] = newQueue.splice(fromIndex, 1);
     newQueue.splice(toIndex, 0, movedItem);
 
-    let newCurrentIndex = state.currentIndex;
+    let newQueueIndex = state.queueIndex;
     
     // Update current index based on the move
-    if (fromIndex === state.currentIndex) {
+    if (fromIndex === state.queueIndex) {
       // The current song was moved
-      newCurrentIndex = toIndex;
-    } else if (fromIndex < state.currentIndex && toIndex >= state.currentIndex) {
+      newQueueIndex = toIndex;
+    } else if (fromIndex < state.queueIndex && toIndex >= state.queueIndex) {
       // Song moved from before current to after current
-      newCurrentIndex = state.currentIndex - 1;
-    } else if (fromIndex > state.currentIndex && toIndex <= state.currentIndex) {
+      newQueueIndex = state.queueIndex - 1;
+    } else if (fromIndex > state.queueIndex && toIndex <= state.queueIndex) {
       // Song moved from after current to before current
-      newCurrentIndex = state.currentIndex + 1;
+      newQueueIndex = state.queueIndex + 1;
     }
 
     set({
       queue: newQueue,
-      currentIndex: newCurrentIndex
+      queueIndex: newQueueIndex
     });
   },
 
