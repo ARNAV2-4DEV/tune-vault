@@ -156,43 +156,60 @@ export const useMusicPlayer = create<MusicPlayerState>((set, get) => ({
       return;
     }
 
-    // Check if we're playing from queue
-    if (state.isPlayingFromQueue()) {
-      const nextQueueIndex = state.queueIndex + 1;
-      
-      if (nextQueueIndex < state.queue.length) {
-        // Play next song in queue
-        set({
-          currentSong: state.queue[nextQueueIndex],
-          queueIndex: nextQueueIndex,
-          currentTime: 0,
-          isPlaying: true
-        });
-      } else {
-        // Queue finished, switch to original playlist
-        if (state.originalPlaylist.length > 0) {
-          // Resume from where we left off in original playlist, or start from beginning
-          let resumeIndex = Math.max(0, state.originalPlaylistIndex);
-          
-          // If we were at the end of the playlist and repeat is 'all', start from beginning
-          if (resumeIndex >= state.originalPlaylist.length && state.repeat === 'all') {
-            resumeIndex = 0;
-          }
-          
+    // Priority 1: If there are songs in queue, play them first
+    if (state.queue.length > 0) {
+      if (state.isPlayingFromQueue()) {
+        // Currently playing from queue, move to next song in queue
+        const nextQueueIndex = state.queueIndex + 1;
+        
+        if (nextQueueIndex < state.queue.length) {
+          // Play next song in queue
           set({
-            currentSong: state.originalPlaylist[resumeIndex],
-            originalPlaylistIndex: resumeIndex,
-            queueIndex: -1, // No longer playing from queue
+            currentSong: state.queue[nextQueueIndex],
+            queueIndex: nextQueueIndex,
             currentTime: 0,
             isPlaying: true
           });
         } else {
-          // No original playlist, stop playing
-          set({ isPlaying: false });
+          // Queue finished, switch to original playlist
+          if (state.originalPlaylist.length > 0) {
+            // Resume from next song in original playlist after where we were
+            let resumeIndex = state.originalPlaylistIndex + 1;
+            
+            // If we're at the end and repeat is 'all', start from beginning
+            if (resumeIndex >= state.originalPlaylist.length && state.repeat === 'all') {
+              resumeIndex = 0;
+            }
+            
+            if (resumeIndex < state.originalPlaylist.length) {
+              set({
+                currentSong: state.originalPlaylist[resumeIndex],
+                originalPlaylistIndex: resumeIndex,
+                queueIndex: -1, // No longer playing from queue
+                currentTime: 0,
+                isPlaying: true
+              });
+            } else {
+              // End of playlist
+              set({ isPlaying: false });
+            }
+          } else {
+            // No original playlist, stop playing
+            set({ isPlaying: false });
+          }
         }
+      } else {
+        // Currently playing from original playlist, but queue has songs
+        // Switch to queue and start from the beginning
+        set({
+          currentSong: state.queue[0],
+          queueIndex: 0,
+          currentTime: 0,
+          isPlaying: true
+        });
       }
     } else {
-      // Playing from original playlist
+      // No queue, playing from original playlist
       const nextPlaylistIndex = state.originalPlaylistIndex + 1;
       
       if (nextPlaylistIndex < state.originalPlaylist.length) {
@@ -282,7 +299,22 @@ export const useMusicPlayer = create<MusicPlayerState>((set, get) => ({
     
     if (existingIndex === -1) {
       // Add song to end of queue
-      set({ queue: [...state.queue, song] });
+      const newQueue = [...state.queue, song];
+      
+      // If no song is currently playing, start playing the first song in queue
+      if (!state.currentSong) {
+        set({
+          queue: newQueue,
+          currentSong: song,
+          queueIndex: newQueue.length - 1,
+          isPlaying: true,
+          currentTime: 0
+        });
+      } else {
+        // If currently playing from original playlist and queue was empty, 
+        // the queue will be played after current song finishes
+        set({ queue: newQueue });
+      }
     }
   },
 
