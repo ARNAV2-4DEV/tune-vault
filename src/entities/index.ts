@@ -12,6 +12,8 @@ export interface Playlists {
   _createdDate?: Date;
   _updatedDate?: Date;
   /** @wixFieldType text */
+  songs?: string;
+  /** @wixFieldType text */
   playlistName?: string;
   /** @wixFieldType text */
   uploadedBy?: string;
@@ -25,8 +27,6 @@ export interface Playlists {
   isPublic?: boolean;
   /** @wixFieldType date */
   creationDate?: Date | string;
-  /** @wixFieldType text */
-  songs?: string;
 }
 
 

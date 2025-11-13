@@ -11,7 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Upload, Music, Image as ImageIcon, CheckCircle, AlertCircle, X, Edit, Play, Clock, Disc } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 interface SongMetadata {
   file: File;
@@ -306,7 +306,17 @@ export default function AlbumUploadPage() {
             <Disc className="h-8 w-8 mr-3" />
             Upload Album
           </h1>
-          <p className="text-foreground/70 font-paragraph">Upload multiple songs as an album with automatic metadata detection</p>
+          <p className="text-foreground/70 font-paragraph">
+            Upload multiple songs as an album with automatic metadata detection
+          </p>
+          <div className="mt-4 flex space-x-4">
+            <Link to="/upload" className="text-secondary hover:underline font-paragraph text-sm">
+              Upload single song
+            </Link>
+            <Link to="/upload-folder" className="text-secondary hover:underline font-paragraph text-sm">
+              Upload folder
+            </Link>
+          </div>
         </div>
 
         {/* Progress Steps */}

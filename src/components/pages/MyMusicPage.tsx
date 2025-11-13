@@ -10,7 +10,7 @@ import { Image } from '@/components/ui/image';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Link } from 'react-router-dom';
-import { Music, Search, Upload, Play, Clock, Calendar, Trash2, Disc, Pause, Plus, List, Grid, MoreVertical, ListMusic, Trash, CheckCircle } from 'lucide-react';
+import { Music, Search, Upload, Play, Clock, Calendar, Trash2, Disc, Pause, Plus, List, Grid, MoreVertical, ListMusic, Trash, CheckCircle, FolderOpen } from 'lucide-react';
 import { format } from 'date-fns';
 import { useMusicPlayer } from '@/stores/musicPlayerStore';
 
@@ -244,6 +244,12 @@ export default function MyMusicPage() {
                 Upload Album
               </Button>
             </Link>
+            <Link to="/upload-folder">
+              <Button variant="outline" className="border-neon-teal text-neon-teal hover:bg-neon-teal hover:text-black font-paragraph">
+                <FolderOpen className="h-4 w-4 mr-2" />
+                Upload Folder
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -270,6 +276,12 @@ export default function MyMusicPage() {
                   <Button variant="outline" className="border-secondary text-secondary hover:bg-secondary hover:text-black font-paragraph">
                     <Disc className="h-4 w-4 mr-2" />
                     Upload Album
+                  </Button>
+                </Link>
+                <Link to="/upload-folder">
+                  <Button variant="outline" className="border-neon-teal text-neon-teal hover:bg-neon-teal hover:text-black font-paragraph">
+                    <FolderOpen className="h-4 w-4 mr-2" />
+                    Upload Folder
                   </Button>
                 </Link>
               </div>

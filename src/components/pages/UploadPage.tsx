@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Upload, Music, Image as ImageIcon, CheckCircle, AlertCircle, Disc } from 'lucide-react';
+import { Upload, Music, Image as ImageIcon, CheckCircle, AlertCircle, Disc, FolderOpen } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 
 export default function UploadPage() {
@@ -145,7 +145,7 @@ export default function UploadPage() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-neon-teal font-heading mb-2">Upload Single Song</h1>
           <p className="text-foreground/70 font-paragraph">
-            Upload a single track or <Link to="/upload-album" className="text-secondary hover:underline">upload an entire album</Link>
+            Upload a single track, <Link to="/upload-album" className="text-secondary hover:underline">upload an entire album</Link>, or <Link to="/upload-folder" className="text-secondary hover:underline">upload a folder</Link>
           </p>
         </div>
 
@@ -305,6 +305,16 @@ export default function UploadPage() {
 
               {/* Submit Button */}
               <div className="flex justify-end space-x-4">
+                <Link to="/upload-folder">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-neon-teal text-neon-teal hover:bg-neon-teal hover:text-black"
+                  >
+                    <FolderOpen className="h-4 w-4 mr-2" />
+                    Upload Folder Instead
+                  </Button>
+                </Link>
                 <Link to="/upload-album">
                   <Button
                     type="button"
