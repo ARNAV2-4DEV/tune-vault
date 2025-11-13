@@ -200,6 +200,9 @@ export default function MyMusicPage() {
       setSongs([]);
       setFilteredSongs([]);
       
+      // Check and delete empty playlists
+      await checkAndDeleteEmptyPlaylists();
+      
       console.log(`Successfully deleted ${songs.length} songs`);
     } catch (error) {
       console.error('Error deleting all songs:', error);
@@ -214,8 +217,73 @@ export default function MyMusicPage() {
     try {
       await BaseCrudService.delete('songs', songId);
       setSongs(prev => prev.filter(song => song._id !== songId));
+      
+      // Check and delete empty playlists after removing this song
+      await checkAndDeleteEmptyPlaylists();
     } catch (error) {
       console.error('Error deleting song:', error);
+    }
+  };
+
+  // Utility function to check and delete empty playlists
+  const checkAndDeleteEmptyPlaylists = async () => {
+    try {
+      // Get all user playlists
+      const playlistsResponse = await BaseCrudService.getAll<Playlists>('playlists');
+      const userPlaylists = playlistsResponse.items.filter(playlist => 
+        playlist.uploadedBy === member?.loginEmail || 
+        playlist.uploadedBy === (member as any)?._id ||
+        playlist.creator === member?.loginEmail ||
+        playlist.creator === (member as any)?._id
+      );
+
+      // Get all remaining user songs
+      const songsResponse = await BaseCrudService.getAll<Songs>('songs');
+      const remainingUserSongs = songsResponse.items.filter(song => 
+        song.uploadedBy === member?.loginEmail || 
+        song.uploadedBy === (member as any)?._id
+      );
+      const remainingSongIds = remainingUserSongs.map(song => song._id);
+
+      // Check each playlist for empty or invalid songs
+      for (const playlist of userPlaylists) {
+        if (!playlist.songs || playlist.songs.trim() === '') {
+          // Playlist is already empty, delete it
+          await BaseCrudService.delete('playlists', playlist._id);
+          console.log(`Deleted empty playlist: ${playlist.playlistName}`);
+          continue;
+        }
+
+        // Check if playlist contains any valid songs
+        const playlistSongIds = playlist.songs.split(',').filter(id => id.trim());
+        const validSongIds = playlistSongIds.filter(songId => remainingSongIds.includes(songId.trim()));
+
+        if (validSongIds.length === 0) {
+          // No valid songs remain in this playlist, delete it
+          await BaseCrudService.delete('playlists', playlist._id);
+          console.log(`Deleted empty playlist: ${playlist.playlistName} (all songs removed)`);
+        } else if (validSongIds.length !== playlistSongIds.length) {
+          // Some songs were removed, update the playlist with only valid songs
+          const updatedSongs = validSongIds.join(',');
+          await BaseCrudService.update('playlists', {
+            _id: playlist._id,
+            songs: updatedSongs
+          });
+          console.log(`Updated playlist: ${playlist.playlistName} (removed invalid songs)`);
+        }
+      }
+
+      // Refresh playlists state
+      const updatedPlaylistsResponse = await BaseCrudService.getAll<Playlists>('playlists');
+      const updatedUserPlaylists = updatedPlaylistsResponse.items.filter(playlist => 
+        playlist.uploadedBy === member?.loginEmail || 
+        playlist.uploadedBy === (member as any)?._id ||
+        playlist.creator === member?.loginEmail ||
+        playlist.creator === (member as any)?._id
+      );
+      setPlaylists(updatedUserPlaylists);
+    } catch (error) {
+      console.error('Error checking and deleting empty playlists:', error);
     }
   };
 

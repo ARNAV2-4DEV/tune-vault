@@ -160,6 +160,18 @@ export default function PlaylistDetailPage() {
     
     try {
       const newSongs = songs.filter(song => song._id !== songToRemove._id);
+      
+      // If this is the last song in the playlist, delete the entire playlist
+      if (newSongs.length === 0) {
+        await BaseCrudService.delete('playlists', id!);
+        console.log(`Deleted empty playlist: ${playlist?.playlistName}`);
+        
+        // Navigate back to playlists page since this playlist no longer exists
+        window.location.href = '/playlists';
+        return;
+      }
+      
+      // Otherwise, update the playlist with remaining songs
       const newSongIds = newSongs.map(song => song._id).join(',');
       
       await BaseCrudService.update('playlists', {
