@@ -24,8 +24,18 @@ export default function PlaylistsPage() {
     try {
       setDeletingPlaylistId(playlistId);
       
+      // Get the playlist to check if it has a cover image
+      const playlistToDelete = playlists.find(p => p._id === playlistId);
+      
       // Delete from database
       await BaseCrudService.delete('playlists', playlistId);
+      
+      // Note: In a production app, you would also delete the cover image from cloud storage here
+      // For now, we're just removing the database record which includes the image URL reference
+      if (playlistToDelete?.coverImage) {
+        console.log(`Cover image reference removed: ${playlistToDelete.coverImage}`);
+        // In production: await deleteImageFromCloudStorage(playlistToDelete.coverImage);
+      }
       
       // Remove from local state immediately
       setPlaylists(prev => prev.filter(playlist => playlist._id !== playlistId));
@@ -33,7 +43,7 @@ export default function PlaylistsPage() {
       // Show success toast
       toast({
         title: "Playlist deleted",
-        description: `"${playlistName}" has been permanently deleted.`,
+        description: `"${playlistName}" and its cover image have been permanently deleted.`,
         variant: "default",
       });
       

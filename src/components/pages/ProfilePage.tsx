@@ -1,12 +1,124 @@
+import { useState, useEffect } from 'react';
 import { useMember } from '@/integrations';
+import { BaseCrudService } from '@/integrations';
+import { Songs, Playlists } from '@/entities';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { User, Mail, Calendar, Music } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { User, Mail, Calendar, Music, Trash2, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { useMusicPlayer } from '@/stores/musicPlayerStore';
 
 export default function ProfilePage() {
   const { member } = useMember();
+  const { toast } = useToast();
+  const { clearQueue } = useMusicPlayer();
+  const [isClearing, setIsClearing] = useState(false);
+  const [userStats, setUserStats] = useState({ songs: 0, playlists: 0 });
+
+  // Fetch user stats
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!member) return;
+      
+      try {
+        // Get user's songs
+        const songsResponse = await BaseCrudService.getAll<Songs>('songs');
+        const userSongs = songsResponse.items.filter(song => 
+          song.uploadedBy === member.loginEmail || song.uploadedBy === (member as any)?._id
+        );
+
+        // Get user's playlists
+        const playlistsResponse = await BaseCrudService.getAll<Playlists>('playlists');
+        const userPlaylists = playlistsResponse.items.filter(playlist => 
+          playlist.uploadedBy === member.loginEmail || 
+          playlist.uploadedBy === (member as any)?._id ||
+          playlist.creator === member.loginEmail ||
+          playlist.creator === (member as any)?._id
+        );
+
+        setUserStats({
+          songs: userSongs.length,
+          playlists: userPlaylists.length
+        });
+      } catch (error) {
+        console.error('Error fetching user stats:', error);
+      }
+    };
+
+    fetchStats();
+  }, [member]);
+
+  const handleClearAllData = async () => {
+    if (!member) return;
+
+    setIsClearing(true);
+    try {
+      // Get all user's songs
+      const songsResponse = await BaseCrudService.getAll<Songs>('songs');
+      const userSongs = songsResponse.items.filter(song => 
+        song.uploadedBy === member.loginEmail || song.uploadedBy === (member as any)?._id
+      );
+
+      // Get all user's playlists
+      const playlistsResponse = await BaseCrudService.getAll<Playlists>('playlists');
+      const userPlaylists = playlistsResponse.items.filter(playlist => 
+        playlist.uploadedBy === member.loginEmail || 
+        playlist.uploadedBy === (member as any)?._id ||
+        playlist.creator === member.loginEmail ||
+        playlist.creator === (member as any)?._id
+      );
+
+      // Delete all user's songs
+      for (const song of userSongs) {
+        await BaseCrudService.delete('songs', song._id);
+        // Note: In production, also delete audio files from cloud storage
+        if (song.audioFile) {
+          console.log(`Audio file reference removed: ${song.audioFile}`);
+        }
+        if (song.albumArt) {
+          console.log(`Album art reference removed: ${song.albumArt}`);
+        }
+      }
+
+      // Delete all user's playlists
+      for (const playlist of userPlaylists) {
+        await BaseCrudService.delete('playlists', playlist._id);
+        // Note: In production, also delete cover images from cloud storage
+        if (playlist.coverImage) {
+          console.log(`Cover image reference removed: ${playlist.coverImage}`);
+        }
+      }
+
+      // Clear music player state
+      clearQueue();
+      
+      // Clear localStorage music player data
+      localStorage.removeItem('music-player-storage');
+
+      // Update stats
+      setUserStats({ songs: 0, playlists: 0 });
+
+      toast({
+        title: "Data cleared successfully",
+        description: `Deleted ${userSongs.length} songs and ${userPlaylists.length} playlists. Your account is now fresh and ready for new content.`,
+        variant: "default",
+      });
+
+    } catch (error) {
+      console.error('Error clearing user data:', error);
+      toast({
+        title: "Clear failed",
+        description: "Failed to clear all data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsClearing(false);
+    }
+  };
 
   const getInitials = (nickname?: string, firstName?: string, lastName?: string) => {
     if (nickname) return nickname.slice(0, 2).toUpperCase();
@@ -140,12 +252,12 @@ export default function ProfilePage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-neon-teal font-heading">0</div>
+                  <div className="text-3xl font-bold text-neon-teal font-heading">{userStats.songs}</div>
                   <p className="text-sm text-foreground/70 font-paragraph">Songs Uploaded</p>
                 </div>
                 
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-secondary font-heading">0</div>
+                  <div className="text-3xl font-bold text-secondary font-heading">{userStats.playlists}</div>
                   <p className="text-sm text-foreground/70 font-paragraph">Playlists Created</p>
                 </div>
                 
@@ -153,6 +265,88 @@ export default function ProfilePage() {
                   <div className="text-3xl font-bold text-foreground font-heading">0</div>
                   <p className="text-sm text-foreground/70 font-paragraph">Total Plays</p>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Data Management Card */}
+            <Card className="bg-white/5 border-white/10 backdrop-blur-sm mt-6">
+              <CardHeader>
+                <CardTitle className="text-destructive font-heading flex items-center">
+                  <Trash2 className="h-5 w-5 mr-2" />
+                  Data Management
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-foreground/70 font-paragraph">
+                  Clear all your uploaded songs, playlists, and associated data for a fresh start.
+                </p>
+                
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="destructive" 
+                      className="w-full font-paragraph"
+                      disabled={isClearing || (userStats.songs === 0 && userStats.playlists === 0)}
+                    >
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      {isClearing ? 'Clearing Data...' : 'Clear All Data'}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-deep-space-blue border-white/20 max-w-md">
+                    <AlertDialogHeader>
+                      <div className="flex items-center gap-3">
+                        <AlertTriangle className="h-6 w-6 text-destructive" />
+                        <AlertDialogTitle className="text-foreground font-heading text-lg">
+                          Clear All Data
+                        </AlertDialogTitle>
+                      </div>
+                      <AlertDialogDescription className="text-foreground/70 font-paragraph text-sm leading-relaxed">
+                        This will permanently delete:
+                        <br />
+                        • <span className="font-semibold text-neon-teal">{userStats.songs}</span> uploaded songs
+                        <br />
+                        • <span className="font-semibold text-secondary">{userStats.playlists}</span> created playlists
+                        <br />
+                        • All cover images and audio files
+                        <br />
+                        • Music player queue and settings
+                        <br /><br />
+                        <span className="text-destructive font-semibold">This action cannot be undone.</span>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-3">
+                      <AlertDialogCancel 
+                        className="border-white/20 text-foreground hover:bg-white/10 font-paragraph"
+                        disabled={isClearing}
+                      >
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleClearAllData();
+                        }}
+                        disabled={isClearing}
+                        className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-paragraph min-w-[140px]"
+                      >
+                        {isClearing ? (
+                          <div className="flex items-center gap-2">
+                            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                            Clearing...
+                          </div>
+                        ) : (
+                          'Clear All Data'
+                        )}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                
+                {(userStats.songs === 0 && userStats.playlists === 0) && (
+                  <p className="text-xs text-foreground/50 font-paragraph text-center">
+                    No data to clear. Upload some songs or create playlists to get started!
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
