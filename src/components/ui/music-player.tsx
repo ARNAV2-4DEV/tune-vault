@@ -48,7 +48,7 @@ export function MusicPlayer() {
     setDuration,
     setIsPlaying,
     setRepeat,
-    shuffleQueue,
+    toggleShuffle,
     removeFromQueue,
     reorderQueue,
     isPlayingFromQueue,
@@ -268,8 +268,9 @@ export function MusicPlayer() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={shuffleQueue}
-                  className={`hover:bg-white/10 ${shuffle ? 'text-neon-teal' : 'text-foreground/70'}`}
+                  onClick={toggleShuffle}
+                  className={`hover:bg-white/10 disabled:opacity-50 ${shuffle ? 'text-neon-teal' : 'text-foreground/70'}`}
+                  disabled={!currentSong || (queue.length <= 1 && originalPlaylist.length <= 1)}
                 >
                   <Shuffle className="h-4 w-4" />
                 </Button>
@@ -278,14 +279,16 @@ export function MusicPlayer() {
                   variant="ghost"
                   size="sm"
                   onClick={previousSong}
-                  className="hover:bg-white/10 text-foreground"
+                  className="hover:bg-white/10 text-foreground disabled:opacity-50"
+                  disabled={!currentSong}
                 >
                   <SkipBack className="h-4 w-4" />
                 </Button>
 
                 <Button
                   onClick={isPlaying ? pauseSong : resumeSong}
-                  className="bg-neon-teal text-black hover:bg-neon-teal/90 w-10 h-10 rounded-full"
+                  className="bg-neon-teal text-black hover:bg-neon-teal/90 w-10 h-10 rounded-full disabled:opacity-50"
+                  disabled={!currentSong}
                 >
                   {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                 </Button>
@@ -294,7 +297,8 @@ export function MusicPlayer() {
                   variant="ghost"
                   size="sm"
                   onClick={nextSong}
-                  className="hover:bg-white/10 text-foreground"
+                  className="hover:bg-white/10 text-foreground disabled:opacity-50"
+                  disabled={!currentSong}
                 >
                   <SkipForward className="h-4 w-4" />
                 </Button>
@@ -303,11 +307,11 @@ export function MusicPlayer() {
                   variant="ghost"
                   size="sm"
                   onClick={handleRepeatToggle}
-                  className={`hover:bg-white/10 ${repeat !== 'none' ? 'text-neon-teal' : 'text-foreground/70'}`}
+                  className={`hover:bg-white/10 relative ${repeat !== 'none' ? 'text-neon-teal' : 'text-foreground/70'}`}
                 >
                   <Repeat className="h-4 w-4" />
                   {repeat === 'one' && (
-                    <span className="absolute -top-1 -right-1 text-xs">1</span>
+                    <span className="absolute -top-1 -right-1 text-xs bg-neon-teal text-black rounded-full w-4 h-4 flex items-center justify-center font-bold">1</span>
                   )}
                 </Button>
               </div>

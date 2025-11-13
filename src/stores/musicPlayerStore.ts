@@ -21,6 +21,12 @@ interface MusicPlayerState {
   shuffle: boolean;
   repeat: 'none' | 'one' | 'all';
   
+  // Shuffle state tracking
+  isQueueShuffled: boolean;
+  isPlaylistShuffled: boolean;
+  unshuffledQueue: Songs[];
+  unshuffledPlaylist: Songs[];
+  
   // Player actions
   playSong: (song: Songs, playlist?: Songs[]) => void;
   pauseSong: () => void;
@@ -34,7 +40,7 @@ interface MusicPlayerState {
   addToQueue: (song: Songs) => void;
   removeFromQueue: (index: number) => void;
   clearQueue: () => void;
-  shuffleQueue: () => void;
+  toggleShuffle: () => void;
   reorderQueue: (fromIndex: number, toIndex: number) => void;
   setRepeat: (mode: 'none' | 'one' | 'all') => void;
   
@@ -62,6 +68,12 @@ export const useMusicPlayer = create<MusicPlayerState>((set, get) => ({
   originalPlaylistIndex: -1,
   shuffle: false,
   repeat: 'none',
+  
+  // Shuffle state tracking
+  isQueueShuffled: false,
+  isPlaylistShuffled: false,
+  unshuffledQueue: [],
+  unshuffledPlaylist: [],
 
   // Helper getters
   isPlayingFromQueue: () => {
@@ -160,7 +172,13 @@ export const useMusicPlayer = create<MusicPlayerState>((set, get) => ({
         // Queue finished, switch to original playlist
         if (state.originalPlaylist.length > 0) {
           // Resume from where we left off in original playlist, or start from beginning
-          const resumeIndex = Math.max(0, state.originalPlaylistIndex);
+          let resumeIndex = Math.max(0, state.originalPlaylistIndex);
+          
+          // If we were at the end of the playlist and repeat is 'all', start from beginning
+          if (resumeIndex >= state.originalPlaylist.length && state.repeat === 'all') {
+            resumeIndex = 0;
+          }
+          
           set({
             currentSong: state.originalPlaylist[resumeIndex],
             originalPlaylistIndex: resumeIndex,
@@ -203,6 +221,12 @@ export const useMusicPlayer = create<MusicPlayerState>((set, get) => ({
   previousSong: () => {
     const state = get();
     
+    // If we're more than 3 seconds into the song, restart it
+    if (state.currentTime > 3) {
+      set({ currentTime: 0, isPlaying: true });
+      return;
+    }
+    
     // Check if we're playing from queue
     if (state.isPlayingFromQueue()) {
       const prevQueueIndex = state.queueIndex - 1;
@@ -216,7 +240,7 @@ export const useMusicPlayer = create<MusicPlayerState>((set, get) => ({
           isPlaying: true
         });
       } else {
-        // At beginning of queue, stay at first song
+        // At beginning of queue, restart current song
         set({ currentTime: 0, isPlaying: true });
       }
     } else {
@@ -348,40 +372,88 @@ export const useMusicPlayer = create<MusicPlayerState>((set, get) => ({
     }
   },
 
-  shuffleQueue: () => {
+  toggleShuffle: () => {
     const state = get();
-    if (state.queue.length <= 1) return;
-
-    const currentSong = state.isPlayingFromQueue() ? state.currentSong : null;
-    let newQueue = [...state.queue];
-    let newQueueIndex = state.queueIndex;
     
-    if (currentSong) {
-      // Remove current song from shuffle, add it back at the beginning
-      newQueue = state.queue.filter(song => song._id !== currentSong._id);
-      
-      // Fisher-Yates shuffle for remaining songs
-      for (let i = newQueue.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [newQueue[i], newQueue[j]] = [newQueue[j], newQueue[i]];
+    if (state.shuffle) {
+      // Turn off shuffle - restore original order
+      if (state.isPlayingFromQueue() && state.isQueueShuffled) {
+        // Restore queue order
+        const currentSong = state.currentSong;
+        const currentSongIndex = state.unshuffledQueue.findIndex(song => song._id === currentSong?._id);
+        
+        set({
+          queue: [...state.unshuffledQueue],
+          queueIndex: currentSongIndex >= 0 ? currentSongIndex : 0,
+          isQueueShuffled: false,
+          shuffle: false
+        });
+      } else if (!state.isPlayingFromQueue() && state.isPlaylistShuffled) {
+        // Restore playlist order
+        const currentSong = state.currentSong;
+        const currentSongIndex = state.unshuffledPlaylist.findIndex(song => song._id === currentSong?._id);
+        
+        set({
+          originalPlaylist: [...state.unshuffledPlaylist],
+          originalPlaylistIndex: currentSongIndex >= 0 ? currentSongIndex : 0,
+          isPlaylistShuffled: false,
+          shuffle: false
+        });
+      } else {
+        // Just turn off shuffle flag
+        set({ shuffle: false });
       }
-      
-      // Put current song at the beginning
-      newQueue = [currentSong, ...newQueue];
-      newQueueIndex = 0;
     } else {
-      // Fisher-Yates shuffle entire queue
-      for (let i = newQueue.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [newQueue[i], newQueue[j]] = [newQueue[j], newQueue[i]];
+      // Turn on shuffle
+      if (state.isPlayingFromQueue() && state.queue.length > 1) {
+        // Shuffle queue
+        const currentSong = state.currentSong;
+        const unshuffledQueue = [...state.queue];
+        const otherSongs = state.queue.filter(song => song._id !== currentSong?._id);
+        
+        // Fisher-Yates shuffle for remaining songs
+        for (let i = otherSongs.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [otherSongs[i], otherSongs[j]] = [otherSongs[j], otherSongs[i]];
+        }
+        
+        // Put current song at the beginning
+        const shuffledQueue = currentSong ? [currentSong, ...otherSongs] : otherSongs;
+        
+        set({
+          queue: shuffledQueue,
+          queueIndex: currentSong ? 0 : -1,
+          unshuffledQueue: unshuffledQueue,
+          isQueueShuffled: true,
+          shuffle: true
+        });
+      } else if (!state.isPlayingFromQueue() && state.originalPlaylist.length > 1) {
+        // Shuffle playlist
+        const currentSong = state.currentSong;
+        const unshuffledPlaylist = [...state.originalPlaylist];
+        const otherSongs = state.originalPlaylist.filter(song => song._id !== currentSong?._id);
+        
+        // Fisher-Yates shuffle for remaining songs
+        for (let i = otherSongs.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [otherSongs[i], otherSongs[j]] = [otherSongs[j], otherSongs[i]];
+        }
+        
+        // Put current song at the beginning
+        const shuffledPlaylist = currentSong ? [currentSong, ...otherSongs] : otherSongs;
+        
+        set({
+          originalPlaylist: shuffledPlaylist,
+          originalPlaylistIndex: currentSong ? 0 : -1,
+          unshuffledPlaylist: unshuffledPlaylist,
+          isPlaylistShuffled: true,
+          shuffle: true
+        });
+      } else {
+        // Just turn on shuffle flag
+        set({ shuffle: true });
       }
     }
-    
-    set({
-      queue: newQueue,
-      queueIndex: newQueueIndex,
-      shuffle: !state.shuffle
-    });
   },
 
   reorderQueue: (fromIndex: number, toIndex: number) => {

@@ -10,7 +10,7 @@ import { Image } from '@/components/ui/image';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Link } from 'react-router-dom';
-import { Music, Search, Upload, Play, Clock, Calendar, Trash2, Disc, Pause, Plus, List, Grid, MoreVertical, ListMusic, Trash, CheckCircle, FolderOpen } from 'lucide-react';
+import { Music, Search, Upload, Play, Clock, Calendar, Trash2, Disc, Pause, Plus, List, Grid, MoreVertical, ListMusic, Trash, CheckCircle, FolderOpen, Shuffle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useMusicPlayer } from '@/stores/musicPlayerStore';
 import { AddToPlaylist } from '@/components/ui/add-to-playlist';
@@ -35,7 +35,9 @@ export default function MyMusicPage() {
     resumeSong, 
     addToQueue,
     queue,
-    originalPlaylist
+    originalPlaylist,
+    toggleShuffle,
+    shuffle
   } = useMusicPlayer();
 
   useEffect(() => {
@@ -338,6 +340,17 @@ export default function MyMusicPage() {
                 >
                   <Play className="h-4 w-4 mr-2" />
                   Play All
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleShuffle}
+                  className={`border-white/20 hover:bg-white/10 font-paragraph ${
+                    shuffle ? 'text-neon-teal border-neon-teal' : 'text-foreground/70'
+                  }`}
+                >
+                  <Shuffle className="h-4 w-4 mr-2" />
+                  {shuffle ? 'Shuffled' : 'Shuffle'}
                 </Button>
                 <div className="text-foreground/70 font-paragraph text-sm">
                   {filteredSongs.length} {filteredSongs.length === 1 ? 'song' : 'songs'}

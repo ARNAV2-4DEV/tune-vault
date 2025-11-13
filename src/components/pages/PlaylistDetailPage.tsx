@@ -7,7 +7,7 @@ import { Image } from '@/components/ui/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, Clock, Calendar, ArrowLeft, Music, Globe, Lock, User, GripVertical, Pause, Plus } from 'lucide-react';
+import { Play, Clock, Calendar, ArrowLeft, Music, Globe, Lock, User, GripVertical, Pause, Plus, Shuffle } from 'lucide-react';
 import { format } from 'date-fns';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
@@ -32,7 +32,9 @@ export default function PlaylistDetailPage() {
     playSong, 
     pauseSong, 
     resumeSong, 
-    addToQueue 
+    addToQueue,
+    toggleShuffle,
+    shuffle
   } = useMusicPlayer();
 
   useEffect(() => {
@@ -301,10 +303,14 @@ export default function PlaylistDetailPage() {
                 <Button 
                   size="lg" 
                   variant="outline" 
-                  className="border-secondary text-secondary hover:bg-secondary hover:text-black"
-                  disabled={songs.length === 0}
+                  onClick={toggleShuffle}
+                  className={`border-secondary hover:bg-secondary hover:text-black ${
+                    shuffle ? 'text-secondary bg-secondary/10' : 'text-secondary'
+                  }`}
+                  disabled={songs.length <= 1}
                 >
-                  Shuffle
+                  <Shuffle className="h-5 w-5 mr-2" />
+                  {shuffle ? 'Shuffled' : 'Shuffle'}
                 </Button>
               </div>
             </div>

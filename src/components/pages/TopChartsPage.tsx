@@ -31,7 +31,9 @@ export default function TopChartsPage() {
     resumeSong, 
     addToQueue,
     queue,
-    originalPlaylist
+    originalPlaylist,
+    toggleShuffle,
+    shuffle
   } = useMusicPlayer();
 
   useEffect(() => {
