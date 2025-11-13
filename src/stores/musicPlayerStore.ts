@@ -29,6 +29,7 @@ interface MusicPlayerState {
   removeFromQueue: (index: number) => void;
   clearQueue: () => void;
   shuffleQueue: () => void;
+  reorderQueue: (fromIndex: number, toIndex: number) => void;
   setRepeat: (mode: 'none' | 'one' | 'all') => void;
   
   // Player state updates
@@ -218,6 +219,37 @@ export const useMusicPlayer = create<MusicPlayerState>((set, get) => ({
       queue: newQueue,
       currentIndex: currentSong ? 0 : -1,
       shuffle: !state.shuffle
+    });
+  },
+
+  reorderQueue: (fromIndex: number, toIndex: number) => {
+    const state = get();
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || 
+        fromIndex >= state.queue.length || toIndex >= state.queue.length) {
+      return;
+    }
+
+    const newQueue = [...state.queue];
+    const [movedItem] = newQueue.splice(fromIndex, 1);
+    newQueue.splice(toIndex, 0, movedItem);
+
+    let newCurrentIndex = state.currentIndex;
+    
+    // Update current index based on the move
+    if (fromIndex === state.currentIndex) {
+      // The current song was moved
+      newCurrentIndex = toIndex;
+    } else if (fromIndex < state.currentIndex && toIndex >= state.currentIndex) {
+      // Song moved from before current to after current
+      newCurrentIndex = state.currentIndex - 1;
+    } else if (fromIndex > state.currentIndex && toIndex <= state.currentIndex) {
+      // Song moved from after current to before current
+      newCurrentIndex = state.currentIndex + 1;
+    }
+
+    set({
+      queue: newQueue,
+      currentIndex: newCurrentIndex
     });
   },
 

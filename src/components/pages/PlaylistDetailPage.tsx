@@ -7,15 +7,30 @@ import { Image } from '@/components/ui/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, Clock, Calendar, ArrowLeft, Music, Globe, Lock, User } from 'lucide-react';
+import { Play, Clock, Calendar, ArrowLeft, Music, Globe, Lock, User, GripVertical, Pause, Plus } from 'lucide-react';
 import { format } from 'date-fns';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import type { DropResult } from '@hello-pangea/dnd';
+import { useMusicPlayer } from '@/stores/musicPlayerStore';
+import { useMember } from '@/integrations';
 
 export default function PlaylistDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { member } = useMember();
   const [playlist, setPlaylist] = useState<Playlists | null>(null);
   const [songs, setSongs] = useState<Songs[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [canEdit, setCanEdit] = useState(false);
+
+  const { 
+    currentSong, 
+    isPlaying, 
+    playSong, 
+    pauseSong, 
+    resumeSong, 
+    addToQueue 
+  } = useMusicPlayer();
 
   useEffect(() => {
     const fetchPlaylistAndSongs = async () => {
@@ -30,11 +45,30 @@ export default function PlaylistDetailPage() {
         const playlistData = await BaseCrudService.getById<Playlists>('playlists', id);
         setPlaylist(playlistData);
 
-        // For demo purposes, fetch some random songs since we don't have playlist-song relationships
-        const songsResponse = await BaseCrudService.getAll<Songs>('songs');
-        // Simulate playlist songs by taking a random subset
-        const shuffledSongs = songsResponse.items.sort(() => 0.5 - Math.random()).slice(0, 8);
-        setSongs(shuffledSongs);
+        // Check if current user can edit this playlist
+        const userCanEdit = member && (
+          playlistData.uploadedBy === member.loginEmail || 
+          playlistData.uploadedBy === (member as any)?._id ||
+          playlistData.creator === member.loginEmail ||
+          playlistData.creator === (member as any)?._id
+        );
+        setCanEdit(!!userCanEdit);
+
+        // Fetch actual songs from playlist
+        if (playlistData.songs) {
+          const songIds = playlistData.songs.split(',').filter(id => id.trim());
+          if (songIds.length > 0) {
+            const allSongs = await BaseCrudService.getAll<Songs>('songs');
+            const playlistSongs = songIds.map(songId => 
+              allSongs.items.find(song => song._id === songId.trim())
+            ).filter(Boolean) as Songs[];
+            setSongs(playlistSongs);
+          } else {
+            setSongs([]);
+          }
+        } else {
+          setSongs([]);
+        }
       } catch (error) {
         console.error('Error fetching playlist:', error);
         setError('Failed to load playlist');
@@ -44,7 +78,79 @@ export default function PlaylistDetailPage() {
     };
 
     fetchPlaylistAndSongs();
-  }, [id]);
+  }, [id, member]);
+
+  const handlePlaySong = (song: Songs) => {
+    if (currentSong?._id === song._id) {
+      if (isPlaying) {
+        pauseSong();
+      } else {
+        resumeSong();
+      }
+    } else {
+      playSong(song, songs);
+    }
+  };
+
+  const handlePlayAll = () => {
+    if (songs.length > 0) {
+      playSong(songs[0], songs);
+    }
+  };
+
+  const handleAddToQueue = (song: Songs) => {
+    addToQueue(song);
+  };
+
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination || !canEdit) return;
+    
+    const fromIndex = result.source.index;
+    const toIndex = result.destination.index;
+    
+    if (fromIndex === toIndex) return;
+
+    // Reorder songs locally
+    const newSongs = [...songs];
+    const [movedSong] = newSongs.splice(fromIndex, 1);
+    newSongs.splice(toIndex, 0, movedSong);
+    setSongs(newSongs);
+
+    // Update playlist in database
+    try {
+      const newSongIds = newSongs.map(song => song._id).join(',');
+      await BaseCrudService.update('playlists', {
+        _id: id!,
+        songs: newSongIds
+      });
+      
+      // Update local playlist state
+      setPlaylist(prev => prev ? { ...prev, songs: newSongIds } : null);
+    } catch (error) {
+      console.error('Error updating playlist order:', error);
+      // Revert local changes on error
+      setSongs(songs);
+    }
+  };
+
+  const handleRemoveFromPlaylist = async (songToRemove: Songs) => {
+    if (!canEdit) return;
+    
+    try {
+      const newSongs = songs.filter(song => song._id !== songToRemove._id);
+      const newSongIds = newSongs.map(song => song._id).join(',');
+      
+      await BaseCrudService.update('playlists', {
+        _id: id!,
+        songs: newSongIds
+      });
+      
+      setSongs(newSongs);
+      setPlaylist(prev => prev ? { ...prev, songs: newSongIds } : null);
+    } catch (error) {
+      console.error('Error removing song from playlist:', error);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -163,11 +269,21 @@ export default function PlaylistDetailPage() {
               </div>
 
               <div className="flex gap-4 pt-4">
-                <Button size="lg" className="bg-secondary text-black hover:bg-secondary/90">
+                <Button 
+                  size="lg" 
+                  onClick={handlePlayAll}
+                  className="bg-secondary text-black hover:bg-secondary/90"
+                  disabled={songs.length === 0}
+                >
                   <Play className="h-5 w-5 mr-2" />
                   Play All
                 </Button>
-                <Button size="lg" variant="outline" className="border-secondary text-secondary hover:bg-secondary hover:text-black">
+                <Button 
+                  size="lg" 
+                  variant="outline" 
+                  className="border-secondary text-secondary hover:bg-secondary hover:text-black"
+                  disabled={songs.length === 0}
+                >
                   Shuffle
                 </Button>
               </div>
@@ -178,71 +294,147 @@ export default function PlaylistDetailPage() {
 
       {/* Songs List */}
       <div className="max-w-[120rem] mx-auto px-8 py-12">
-        <div className="space-y-2">
-          {songs.map((song, index) => (
-            <motion.div
-              key={song._id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.05 }}
-            >
-              <Card className="bg-white/5 border-white/10 backdrop-blur-sm hover:bg-white/10 transition-all duration-300 group">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-4">
-                    {/* Track Number */}
-                    <div className="flex-shrink-0 w-8 text-center">
-                      <span className="text-foreground/50 font-paragraph group-hover:hidden">
-                        {index + 1}
-                      </span>
-                      <Play className="h-4 w-4 text-secondary hidden group-hover:block mx-auto" />
-                    </div>
-
-                    {/* Album Art */}
-                    <div className="flex-shrink-0">
-                      <Image
-                        src={song.albumArt || 'https://static.wixstatic.com/media/888b2d_a541d976e1a44d42bef79181bb055e72~mv2.png?originWidth=128&originHeight=128'}
-                        alt={`${song.title} album art`}
-                        className="w-12 h-12 object-cover rounded"
-                        width={48}
-                      />
-                    </div>
-
-                    {/* Song Info */}
-                    <div className="flex-grow min-w-0">
-                      <Link to={`/song/${song._id}`}>
-                        <h4 className="font-semibold text-foreground hover:text-secondary transition-colors font-heading truncate">
-                          {song.title}
-                        </h4>
-                      </Link>
-                      <p className="text-foreground/70 text-sm font-paragraph truncate">
-                        {song.artistName}
-                      </p>
-                    </div>
-
-                    {/* Album */}
-                    <div className="hidden md:block flex-grow min-w-0">
-                      <p className="text-foreground/70 text-sm font-paragraph truncate">
-                        {song.albumName}
-                      </p>
-                    </div>
-
-                    {/* Duration */}
-                    <div className="flex-shrink-0 text-foreground/50 text-sm font-paragraph">
-                      {song.duration ? `${Math.floor(song.duration / 60)}:${(song.duration % 60).toString().padStart(2, '0')}` : '--:--'}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-
-        {songs.length === 0 && (
-          <div className="text-center py-12">
+        {songs.length === 0 ? (
+          <div className="text-center py-16">
             <Music className="h-16 w-16 text-foreground/30 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-foreground/70 mb-2 font-heading">No songs in this playlist</h3>
-            <p className="text-foreground/50 font-paragraph">Add some tracks to get started</p>
+            <p className="text-foreground/50 font-paragraph">Add some songs to get started!</p>
           </div>
+        ) : (
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="playlist-songs" isDropDisabled={!canEdit}>
+              {(provided) => (
+                <div
+                  {...provided.droppableProps}
+                  ref={provided.innerRef}
+                  className="space-y-2"
+                >
+                  {songs.map((song, index) => (
+                    <Draggable
+                      key={song._id}
+                      draggableId={song._id}
+                      index={index}
+                      isDragDisabled={!canEdit}
+                    >
+                      {(provided, snapshot) => (
+                        <motion.div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          className={`${snapshot.isDragging ? 'z-50' : ''}`}
+                        >
+                          <Card className={`bg-white/5 border-white/10 backdrop-blur-sm hover:bg-white/10 transition-all duration-300 group ${
+                            snapshot.isDragging ? 'shadow-2xl bg-neon-teal/20' : ''
+                          } ${
+                            currentSong?._id === song._id ? 'bg-neon-teal/10 border-neon-teal/30' : ''
+                          }`}>
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-4">
+                                {/* Drag Handle */}
+                                {canEdit && (
+                                  <div
+                                    {...provided.dragHandleProps}
+                                    className="cursor-grab active:cursor-grabbing text-foreground/50 hover:text-foreground/80 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <GripVertical className="h-4 w-4" />
+                                  </div>
+                                )}
+                                
+                                {/* Track Number / Play Button */}
+                                <div className="flex-shrink-0 w-8 text-center">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handlePlaySong(song)}
+                                    className="w-8 h-8 p-0 hover:bg-neon-teal/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    {currentSong?._id === song._id && isPlaying ? (
+                                      <Pause className="h-4 w-4" />
+                                    ) : (
+                                      <Play className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                  <span className={`text-foreground/50 font-paragraph group-hover:hidden ${
+                                    currentSong?._id === song._id ? 'text-neon-teal' : ''
+                                  }`}>
+                                    {index + 1}
+                                  </span>
+                                </div>
+
+                                {/* Album Art */}
+                                <div className="flex-shrink-0">
+                                  <Image
+                                    src={song.albumArt || 'https://static.wixstatic.com/media/888b2d_25308b4add354645b8f5e229f358bbcb~mv2.png?originWidth=192&originHeight=192'}
+                                    alt={`${song.title} album art`}
+                                    className="w-12 h-12 object-cover rounded"
+                                    width={48}
+                                  />
+                                </div>
+
+                                {/* Song Info */}
+                                <div className="flex-grow min-w-0">
+                                  <h3 className={`font-semibold truncate font-heading ${
+                                    currentSong?._id === song._id ? 'text-neon-teal' : 'text-foreground'
+                                  }`}>
+                                    {song.title}
+                                  </h3>
+                                  <p className="text-foreground/70 text-sm truncate font-paragraph">
+                                    {song.artistName}
+                                  </p>
+                                </div>
+
+                                {/* Album Name */}
+                                {song.albumName && (
+                                  <div className="hidden md:block min-w-0 flex-1">
+                                    <p className="text-foreground/50 text-sm truncate font-paragraph">
+                                      {song.albumName}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Duration */}
+                                <div className="text-foreground/50 text-sm font-paragraph">
+                                  {song.duration ? `${Math.floor(song.duration / 60)}:${(song.duration % 60).toString().padStart(2, '0')}` : '--:--'}
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleAddToQueue(song)}
+                                    className="hover:bg-neon-teal/20"
+                                    title="Add to Queue"
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </Button>
+                                  
+                                  {canEdit && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleRemoveFromPlaylist(song)}
+                                      className="hover:bg-red-500/20 text-red-400"
+                                      title="Remove from Playlist"
+                                    >
+                                      ×
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
         )}
       </div>
     </div>

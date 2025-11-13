@@ -15,9 +15,12 @@ import {
   Shuffle,
   List,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  GripVertical
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import type { DropResult } from '@hello-pangea/dnd';
 
 export function MusicPlayer() {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -46,7 +49,8 @@ export function MusicPlayer() {
     setIsPlaying,
     setRepeat,
     shuffleQueue,
-    removeFromQueue
+    removeFromQueue,
+    reorderQueue
   } = useMusicPlayer();
 
   // Audio element event handlers
@@ -195,6 +199,15 @@ export function MusicPlayer() {
     const currentIndex = modes.indexOf(repeat);
     const nextIndex = (currentIndex + 1) % modes.length;
     setRepeat(modes[nextIndex]);
+  };
+
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    
+    const fromIndex = result.source.index;
+    const toIndex = result.destination.index;
+    
+    reorderQueue(fromIndex, toIndex);
   };
 
   if (!currentSong) {
@@ -356,51 +369,82 @@ export function MusicPlayer() {
                 <h3 className="font-semibold text-foreground mb-3 font-heading">
                   Queue ({queue.length} songs)
                 </h3>
-                <div className="space-y-2">
-                  {queue.map((song, index) => (
-                    <div
-                      key={`${song._id}-${index}`}
-                      className={`flex items-center space-x-3 p-2 rounded hover:bg-white/5 transition-colors ${
-                        index === currentIndex ? 'bg-neon-teal/10 border border-neon-teal/30' : ''
-                      }`}
-                    >
-                      <div className="w-6 text-center">
-                        <span className={`text-xs font-paragraph ${
-                          index === currentIndex ? 'text-neon-teal' : 'text-foreground/50'
-                        }`}>
-                          {index + 1}
-                        </span>
-                      </div>
-                      
-                      <Image
-                        src={song.albumArt || 'https://static.wixstatic.com/media/888b2d_25308b4add354645b8f5e229f358bbcb~mv2.png?originWidth=192&originHeight=192'}
-                        alt={`${song.title} album art`}
-                        className="w-8 h-8 rounded object-cover"
-                        width={32}
-                      />
-                      
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm truncate font-heading ${
-                          index === currentIndex ? 'text-neon-teal' : 'text-foreground'
-                        }`}>
-                          {song.title}
-                        </p>
-                        <p className="text-xs text-foreground/70 truncate font-paragraph">
-                          {song.artistName}
-                        </p>
-                      </div>
-                      
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFromQueue(index)}
-                        className="opacity-0 group-hover:opacity-100 hover:bg-red-500/20 text-red-400"
+                <DragDropContext onDragEnd={handleDragEnd}>
+                  <Droppable droppableId="queue">
+                    {(provided) => (
+                      <div
+                        {...provided.droppableProps}
+                        ref={provided.innerRef}
+                        className="space-y-2"
                       >
-                        ×
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                        {queue.map((song, index) => (
+                          <Draggable
+                            key={`${song._id}-${index}`}
+                            draggableId={`${song._id}-${index}`}
+                            index={index}
+                          >
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                className={`flex items-center space-x-3 p-2 rounded transition-colors ${
+                                  snapshot.isDragging 
+                                    ? 'bg-neon-teal/20 shadow-lg' 
+                                    : 'hover:bg-white/5'
+                                } ${
+                                  index === currentIndex ? 'bg-neon-teal/10 border border-neon-teal/30' : ''
+                                }`}
+                              >
+                                <div
+                                  {...provided.dragHandleProps}
+                                  className="cursor-grab active:cursor-grabbing text-foreground/50 hover:text-foreground/80"
+                                >
+                                  <GripVertical className="h-4 w-4" />
+                                </div>
+                                
+                                <div className="w-6 text-center">
+                                  <span className={`text-xs font-paragraph ${
+                                    index === currentIndex ? 'text-neon-teal' : 'text-foreground/50'
+                                  }`}>
+                                    {index + 1}
+                                  </span>
+                                </div>
+                                
+                                <Image
+                                  src={song.albumArt || 'https://static.wixstatic.com/media/888b2d_25308b4add354645b8f5e229f358bbcb~mv2.png?originWidth=192&originHeight=192'}
+                                  alt={`${song.title} album art`}
+                                  className="w-8 h-8 rounded object-cover"
+                                  width={32}
+                                />
+                                
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm truncate font-heading ${
+                                    index === currentIndex ? 'text-neon-teal' : 'text-foreground'
+                                  }`}>
+                                    {song.title}
+                                  </p>
+                                  <p className="text-xs text-foreground/70 truncate font-paragraph">
+                                    {song.artistName}
+                                  </p>
+                                </div>
+                                
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeFromQueue(index)}
+                                  className="opacity-0 group-hover:opacity-100 hover:bg-red-500/20 text-red-400"
+                                >
+                                  ×
+                                </Button>
+                              </div>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </DragDropContext>
               </div>
             </motion.div>
           )}
