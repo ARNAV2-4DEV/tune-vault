@@ -276,9 +276,17 @@ export default function FolderUploadPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const simulateFileUpload = async (file: File): Promise<string> => {
+  const uploadAudioFile = async (file: File): Promise<string> => {
     await new Promise(resolve => setTimeout(resolve, 300));
-    return 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
+    
+    // Create a blob URL for the actual uploaded file
+    // This allows the audio player to play the real uploaded audio
+    const audioUrl = URL.createObjectURL(file);
+    
+    // In a real production app, you would upload to a cloud storage service
+    // and return the permanent URL. For now, we use the blob URL which works
+    // for the current session.
+    return audioUrl;
   };
 
   const handleFinalUpload = async () => {
@@ -299,13 +307,13 @@ export default function FolderUploadPage() {
         const song = songs[i];
         setUploadProgress((i / totalSongs) * 100);
         
-        // Simulate file upload
-        const audioFileUrl = await simulateFileUpload(song.audioFile.file);
+        // Upload the actual audio file
+        const audioFileUrl = await uploadAudioFile(song.audioFile.file);
         
         // Get image URL if available
         let albumArtUrl = '';
         if (song.imageFile) {
-          // In a real app, you would upload the image file here
+          // Create blob URL for the image file
           albumArtUrl = URL.createObjectURL(song.imageFile.file);
         }
         
@@ -332,6 +340,8 @@ export default function FolderUploadPage() {
       setUploadStatus('success');
       
       setTimeout(() => {
+        // Note: The uploaded audio files will be available for playback during this browser session.
+        // In a production app, files would be uploaded to permanent cloud storage.
         navigate('/my-music');
       }, 2000);
 

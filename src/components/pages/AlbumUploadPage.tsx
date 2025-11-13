@@ -214,12 +214,18 @@ export default function AlbumUploadPage() {
     }
   };
 
-  const simulateFileUpload = async (file: File): Promise<string> => {
+  const uploadAudioFile = async (file: File): Promise<string> => {
     // Simulate file upload with progress
     await new Promise(resolve => setTimeout(resolve, 500));
-    // Return a working demo audio file URL for testing
-    // In a real app, this would upload the actual file and return its URL
-    return 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
+    
+    // Create a blob URL for the actual uploaded file
+    // This allows the audio player to play the real uploaded audio
+    const audioUrl = URL.createObjectURL(file);
+    
+    // In a real production app, you would upload to a cloud storage service
+    // and return the permanent URL. For now, we use the blob URL which works
+    // for the current session.
+    return audioUrl;
   };
 
   const handleFinalUpload = async () => {
@@ -240,8 +246,8 @@ export default function AlbumUploadPage() {
         const song = songs[i];
         setUploadProgress((i / totalSongs) * 100);
         
-        // Simulate file upload
-        const audioFileUrl = await simulateFileUpload(song.file);
+        // Upload the actual audio file
+        const audioFileUrl = await uploadAudioFile(song.file);
         
         // Create song record in CMS
         const newSong: Partial<Songs> = {
@@ -267,6 +273,8 @@ export default function AlbumUploadPage() {
       
       // Reset and redirect after success
       setTimeout(() => {
+        // Note: The uploaded audio files will be available for playback during this browser session.
+        // In a production app, files would be uploaded to permanent cloud storage.
         navigate('/my-music');
       }, 2000);
 

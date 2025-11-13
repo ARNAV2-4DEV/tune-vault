@@ -124,6 +124,15 @@ export function MusicPlayer() {
     const handleError = (e: Event) => {
       console.error('Audio loading error:', e);
       console.error('Failed to load audio file:', currentSong.audioFile);
+      
+      // If it's a blob URL that might have been revoked, try to handle gracefully
+      if (currentSong.audioFile?.startsWith('blob:')) {
+        console.warn('Blob URL may have been revoked. Audio file might not be available.');
+        // You could implement fallback logic here, such as:
+        // - Show an error message to the user
+        // - Skip to the next song
+        // - Prompt user to re-upload the file
+      }
     };
     
     const handleCanPlayThrough = () => {
