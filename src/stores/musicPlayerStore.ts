@@ -56,6 +56,7 @@ interface MusicPlayerState {
 }
 
 export const useMusicPlayer = create<MusicPlayerState>((set, get) => ({
+  // ... keep existing code (initial state and all methods)
   // Initial state
   currentSong: null,
   isPlaying: false,
@@ -91,6 +92,7 @@ export const useMusicPlayer = create<MusicPlayerState>((set, get) => ({
     return state.isPlayingFromQueue() ? state.queueIndex : state.originalPlaylistIndex;
   },
 
+  // ... keep existing code (all player actions and methods)
   // Player actions
   playSong: (song: Songs, playlist?: Songs[]) => {
     const state = get();
