@@ -88,7 +88,7 @@ export function AddToPlaylist({
       
       await BaseCrudService.create('playlists', newPlaylist as any);
       
-      onFeedback?.(`Created playlist "${newPlaylistName}" with "${song.title}"`);
+      onFeedback?.(`Created playlist "${newPlaylistName}" and added "${song.title}"`);
       onPlaylistUpdate?.();
       setNewPlaylistName('');
       setIsCreatingPlaylist(false);

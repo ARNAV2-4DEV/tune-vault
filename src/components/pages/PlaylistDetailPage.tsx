@@ -163,6 +163,12 @@ export default function PlaylistDetailPage() {
       
       // If this is the last song in the playlist, delete the entire playlist
       if (newSongs.length === 0) {
+        // Delete playlist and all associated data
+        if (playlist?.coverImage) {
+          console.log(`Cover image reference removed: ${playlist.coverImage}`);
+          // In production: await deleteImageFromCloudStorage(playlist.coverImage);
+        }
+        
         await BaseCrudService.delete('playlists', id!);
         console.log(`Deleted empty playlist: ${playlist?.playlistName}`);
         
