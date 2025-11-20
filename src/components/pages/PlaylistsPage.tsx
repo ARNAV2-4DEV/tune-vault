@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { BaseCrudService } from '@/integrations';
-import { Playlists } from '@/entities';
+import { Playlists, Songs } from '@/entities';
 import { Image } from '@/components/ui/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,16 +24,40 @@ export default function PlaylistsPage() {
     try {
       setDeletingPlaylistId(playlistId);
       
-      // Get the playlist to check if it has a cover image
+      // Get the playlist to check if it has a cover image and songs
       const playlistToDelete = playlists.find(p => p._id === playlistId);
       
-      // Delete from database
+      if (!playlistToDelete) return;
+      
+      // Get all songs to find ones with matching album names
+      const { items: allSongs } = await BaseCrudService.getAll<Songs>('songs');
+      
+      // Parse songs from playlist (it's stored as a string)
+      const playlistSongIds = playlistToDelete.songs ? playlistToDelete.songs.split(',').map(s => s.trim()) : [];
+      
+      // Find songs in this playlist to get their album names
+      const songsInPlaylist = allSongs.filter(song => playlistSongIds.includes(song._id));
+      const albumNamesToDelete = new Set(songsInPlaylist.map(song => song.albumName).filter(Boolean));
+      
+      // Find all songs with matching album names (cascade delete)
+      const songsToDelete = allSongs.filter(song => 
+        song.albumName && albumNamesToDelete.has(song.albumName)
+      );
+      
+      // Delete all matching songs
+      for (const song of songsToDelete) {
+        await BaseCrudService.delete('songs', song._id);
+        if (song.albumArt) {
+          console.log(`Album art reference removed: ${song.albumArt}`);
+        }
+      }
+      
+      // Delete the playlist from database
       await BaseCrudService.delete('playlists', playlistId);
       
       // Log cover image removal for production cleanup
-      if (playlistToDelete?.coverImage) {
+      if (playlistToDelete.coverImage) {
         console.log(`Cover image reference removed: ${playlistToDelete.coverImage}`);
-        // In production: await deleteImageFromCloudStorage(playlistToDelete.coverImage);
       }
       
       // Remove from local state immediately
@@ -42,9 +66,14 @@ export default function PlaylistsPage() {
       // Show success toast
       toast({
         title: "Playlist deleted",
-        description: `"${playlistName}" and all associated data have been permanently removed.`,
+        description: `"${playlistName}" and ${songsToDelete.length} associated song(s) have been permanently removed.`,
         variant: "default",
       });
+      
+      // Refresh the page after a short delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
       
     } catch (error) {
       console.error('Error deleting playlist:', error);
